@@ -1,0 +1,56 @@
+{   
+    "logging": {
+        "logs": {
+            "debug": {
+                "writer": {
+                    "output": "stdout"
+                },
+                "level": "DEBUG"
+            }
+        }
+    },
+    "apps": {
+      "http": {
+        "http_port": 9080,
+        "https_port": 9443,
+        "servers": {
+          "mud": {
+            "listen": [
+              "127.0.0.1:9443"
+            ],
+            "routes": [
+              {
+                "group": "oapi",
+                "match": [
+                  {
+                    "path": [
+                      "/api"
+                    ]
+                  }
+                ],
+                "handle": [
+                  {
+                    "handler": "openapi_validator"
+                  }
+                ]
+              }
+            ],
+            "logs": {}
+          }
+        }
+      },
+      "tls": {
+        "automation": {
+          "policies": [
+            {
+              "subjects": ["localhost"],
+              "issuer":{
+                "module": "internal"
+              },
+              "on_demand": true
+            }
+          ]
+        }
+      }
+    }
+  }
