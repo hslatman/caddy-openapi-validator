@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/caddyserver/caddy/v2"
@@ -41,13 +42,18 @@ func (Validator) CaddyModule() caddy.ModuleInfo {
 // Provision sets up the OpenAPI Validator responder.
 func (v *Validator) Provision(ctx caddy.Context) error {
 
-	specification := v.getOpenAPISpecification(v.Filepath)
+	specification, err := v.getOpenAPISpecification(v.Filepath)
+	if err != nil {
+		return err
+	}
+	specification.Servers = nil  // TODO: enabled this; or make optional via here or options
+	specification.Security = nil // TODO: enabled this; or make optional via here or options
 	v.specification = specification
 
 	router := openapi3filter.NewRouter().WithSwagger(v.specification)
 	v.router = router
 
-	options := nil // TODO: handle other options to pass down
+	var options *ValidatorOptions // TODO: handle other options to pass down
 	v.options = options
 
 	return nil
@@ -85,9 +91,9 @@ func (he *httpError) Error() string {
 	return fmt.Sprintf("code=%d, message=%v", he.Code, he.Message)
 }
 
-func (v *Validator) ServeHTTP(rw http.ResponseWriter, r *http.Request, next caddyhttp.Handler) {
+func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 
-	err := v.validateRequestFromContext(rw, r, router, options)
+	err := v.validateRequestFromContext(w, r)
 	if err != nil {
 		// TODO: we should generate an error response here based on some of the returned data?
 		fmt.Println(err.Error())
@@ -96,7 +102,7 @@ func (v *Validator) ServeHTTP(rw http.ResponseWriter, r *http.Request, next cadd
 	}
 
 	// If everything was OK, we continue to the next handler
-	next(rw, r)
+	return next.ServeHTTP(w, r) // TODO: how to pass additional handlers, like other nexts?
 
 	// TODO: can we also validate responses?
 }
@@ -119,19 +125,21 @@ func (v *Validator) getOpenAPISpecification(path string) (*openapi3.Swagger, err
 
 func (v *Validator) validateRequestFromContext(rw http.ResponseWriter, request *http.Request) *httpError {
 
-	route, pathParams, err := v.router.FindRoute(request.Method, request.URL)
+	url, _ := url.ParseRequestURI(request.URL.String()[4:]) // TODO: cut off /api (or other prefixes); we probably need to do this nicer via an option or automatically from Caddy config?
+	method := request.Method
+	route, pathParams, err := v.router.FindRoute(method, url)
 
-	// We failed to find a matching route for the request.
+	// No route found for the request
 	if err != nil {
 		switch e := err.(type) {
 		case *openapi3filter.RouteError:
-			// We've got a bad request, the path requested doesn't match either server, or path, or something.
+			// The requested path doesn't match the server, or path, or anything else.
 			return &httpError{
 				Code:    http.StatusBadRequest,
 				Message: e.Reason,
 			}
 		default:
-			// This should never happen today, but if our upstream code changes, we don't want to crash the server, so handle the unexpected error.
+			// Provide a fallback in case something unexpected happens
 			return &httpError{
 				Code:    http.StatusInternalServerError,
 				Message: fmt.Sprintf("error validating route: %s", err.Error()),
@@ -145,6 +153,7 @@ func (v *Validator) validateRequestFromContext(rw http.ResponseWriter, request *
 		Route:      route,
 	}
 
+	// TODO: adapt my code below, used within a project that uses Chi, to use a context, if we need that ... ?
 	// // Pass the Chi context into the request validator, so that any callbacks which it invokes make it available.
 	// ctx := request.Context()
 	// requestContext := context.WithValue(context.Background(), chiContextKey, ctx)
@@ -161,9 +170,7 @@ func (v *Validator) validateRequestFromContext(rw http.ResponseWriter, request *
 	if err != nil {
 		switch e := err.(type) {
 		case *openapi3filter.RequestError:
-			// We've got a bad request
-			// Split up the verbose error by lines and return the first one
-			// openapi errors seem to be multi-line with a decent message on the first
+			// A bad request with a verbose error; splitting it and taking the first
 			errorLines := strings.Split(e.Error(), "\n")
 			return &httpError{
 				Code:     http.StatusBadRequest,
@@ -177,8 +184,7 @@ func (v *Validator) validateRequestFromContext(rw http.ResponseWriter, request *
 				Internal: err,
 			}
 		default:
-			// This should never happen today, but if our upstream code changes,
-			// we don't want to crash the server, so handle the unexpected error.
+			// Provide a fallback in case something unexpected happens
 			return &httpError{
 				Code:     http.StatusInternalServerError,
 				Message:  fmt.Sprintf("error validating request: %s", err),

@@ -14,7 +14,7 @@
         "http_port": 9080,
         "https_port": 9443,
         "servers": {
-          "mud": {
+          "oapi-example": {
             "listen": [
               "127.0.0.1:9443"
             ],
@@ -24,13 +24,14 @@
                 "match": [
                   {
                     "path": [
-                      "/api"
+                      "/api*"
                     ]
                   }
                 ],
                 "handle": [
                   {
-                    "handler": "openapi_validator"
+                    "handler": "openapi_validator",
+                    "filepath": "examples/petstore.yaml"
                   }
                 ]
               }
