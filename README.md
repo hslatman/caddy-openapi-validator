@@ -35,3 +35,4 @@ Configure the OpenAPI Validator handler as one of the handlers to be executed fi
 * Improve the example with an actual implementation and more handlers
 * Add other options
 * Look into response validation
+* Look into ways to specify the error nicely

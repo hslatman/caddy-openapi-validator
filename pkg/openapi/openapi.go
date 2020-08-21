@@ -50,11 +50,18 @@ func (v *Validator) Provision(ctx caddy.Context) error {
 	specification.Security = nil // TODO: enabled this; or make optional via here or options
 	v.specification = specification
 
+	// TODO: validate the specification is a valid spec?
 	router := openapi3filter.NewRouter().WithSwagger(v.specification)
 	v.router = router
 
-	var options *ValidatorOptions // TODO: handle other options to pass down
-	v.options = options
+	v.options = &ValidatorOptions{
+		Options: openapi3filter.Options{
+			ExcludeRequestBody:    false,
+			ExcludeResponseBody:   false,
+			IncludeResponseStatus: true,
+		},
+		//ParamDecoder: ,
+	}
 
 	return nil
 }
@@ -152,6 +159,13 @@ func (v *Validator) validateRequestFromContext(rw http.ResponseWriter, request *
 		PathParams: pathParams,
 		Route:      route,
 	}
+
+	if v.options != nil {
+		validationInput.Options = &v.options.Options
+		validationInput.ParamDecoder = v.options.ParamDecoder
+	}
+
+	// TODO: can we invalidate additional query parameters? The default behavior does not seem to take additional params into account
 
 	// TODO: adapt my code below, used within a project that uses Chi, to use a context, if we need that ... ?
 	// // Pass the Chi context into the request validator, so that any callbacks which it invokes make it available.
