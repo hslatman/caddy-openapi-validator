@@ -72,8 +72,12 @@ type Validator struct {
 	options       *ValidatorOptions
 	router        *openapi3filter.Router
 
-	// TODO: options to set: enabled/disabled; server checks enabled; security checks enabled; filepath to OpenAPI
+	// TODO: options to set: enabled/disabled; server checks enabled; security checks enabled
+
+	// The filepath to the OpenAPI (v3) specification to use
 	Filepath string `json:"filepath,omitempty"`
+	// The prefix to strip off when performing validation
+	Prefix string `json:"prefix,omitempty"`
 }
 
 // ValidatorOptions  are optinos to customize request validation.
@@ -132,7 +136,14 @@ func (v *Validator) getOpenAPISpecification(path string) (*openapi3.Swagger, err
 
 func (v *Validator) validateRequestFromContext(rw http.ResponseWriter, request *http.Request) *httpError {
 
-	url, _ := url.ParseRequestURI(request.URL.String()[4:]) // TODO: cut off /api (or other prefixes); we probably need to do this nicer via an option or automatically from Caddy config?
+	// TODO: determine whether this is (still) required when we're checking the servers (again)
+	url, err := url.ParseRequestURI(request.URL.String()[len(v.Prefix):])
+	if err != nil {
+		return &httpError{
+			Code:    http.StatusBadRequest,
+			Message: "error while cutting off prefix",
+		}
+	}
 	method := request.Method
 	route, pathParams, err := v.router.FindRoute(method, url)
 
