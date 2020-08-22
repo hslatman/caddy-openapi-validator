@@ -36,3 +36,4 @@ Configure the OpenAPI Validator handler as one of the handlers to be executed fi
 * Add other options
 * Look into response validation
 * Look into ways to specify the error nicely
+* Add support for remote API specs?

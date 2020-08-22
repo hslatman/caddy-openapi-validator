@@ -1,10 +1,7 @@
 {   
     "logging": {
         "logs": {
-            "debug": {
-                "writer": {
-                    "output": "stdout"
-                },
+            "default": {
                 "level": "DEBUG"
             }
         }

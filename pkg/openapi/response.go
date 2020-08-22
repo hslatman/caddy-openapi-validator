@@ -1,3 +1,17 @@
+// Copyright 2020 Herman Slatman
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package openapi
 
 import (
@@ -57,6 +71,8 @@ type ResponseValidator struct {
 	router        *openapi3filter.Router
 
 	// TODO: options to set: enabled/disabled; server checks enabled; security checks enabled
+	// TODO: add logging
+	// TODO: add option to operate in inspection mode (with logging invalid requests, rather than hard blocking invalid requests)
 
 	// The filepath to the OpenAPI (v3) specification to use
 	Filepath string `json:"filepath,omitempty"`
@@ -82,5 +98,10 @@ func (v *ResponseValidator) ServeHTTP(w http.ResponseWriter, r *http.Request, ne
 
 func (v *ResponseValidator) validateResponseFromContext(rw http.ResponseWriter, request *http.Request) *httpError {
 	fmt.Println("response validation to be implemented")
+
+	// TODO: this handler should be after an actual API call; in case of the example PetStore.go API, handled by Caddy, there's already a
+	// status code. This may also be true when calling other APIs. We should make sure that we can (optionally, based on configuration), overrule
+	// the return status code in case the response is not valid according to the API specification (or just log that.)
+
 	return nil
 }

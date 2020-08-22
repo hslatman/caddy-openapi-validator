@@ -15,15 +15,16 @@
 package openapi
 
 import (
+	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"go.uber.org/zap"
 )
 
 func init() {
@@ -38,8 +39,12 @@ func (RequestValidator) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
+func NoopAuthenticationFunc(context.Context, *openapi3filter.AuthenticationInput) error { return nil }
+
 // Provision sets up the OpenAPI Validator responder.
 func (v *RequestValidator) Provision(ctx caddy.Context) error {
+
+	v.logger = ctx.Logger(v)
 
 	specification, err := readOpenAPISpecification(v.Filepath)
 	if err != nil {
@@ -49,7 +54,7 @@ func (v *RequestValidator) Provision(ctx caddy.Context) error {
 	specification.Security = nil // TODO: enabled this; or make optional via here or options
 	v.specification = specification
 
-	// TODO: validate the specification is a valid spec?
+	// TODO: validate the specification is a valid spec? Is actually performed via WithSwagger, but can break the program, so we might need to to this in Validate()
 	router := openapi3filter.NewRouter().WithSwagger(v.specification)
 	v.router = router
 
@@ -58,7 +63,7 @@ func (v *RequestValidator) Provision(ctx caddy.Context) error {
 			ExcludeRequestBody:    false,
 			ExcludeResponseBody:   false,
 			IncludeResponseStatus: true,
-			//AuthenticationFunc: ,
+			AuthenticationFunc:    NoopAuthenticationFunc, // TODO: can we provide an actual one? And how?
 		},
 		//ParamDecoder: ,
 	}
@@ -71,8 +76,10 @@ type RequestValidator struct {
 	specification *openapi3.Swagger
 	options       *validatorOptions
 	router        *openapi3filter.Router
+	logger        *zap.Logger
 
 	// TODO: options to set: enabled/disabled; server checks enabled; security checks enabled
+	// TODO: add option to operate in inspection mode (with logging invalid requests, rather than hard blocking invalid requests; i.e. don't respond)
 
 	// The filepath to the OpenAPI (v3) specification to use
 	Filepath string `json:"filepath,omitempty"`
@@ -80,30 +87,28 @@ type RequestValidator struct {
 	Prefix string `json:"prefix,omitempty"`
 }
 
+// ServeHTTP is the Caddy handler for serving HTTP requests
 func (v *RequestValidator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 
 	err := v.validateRequestFromContext(w, r)
 	if err != nil {
-		// TODO: we should generate an error response here based on some of the returned data?
-		fmt.Println(err.Error())
+		// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
+		v.logger.Error(err.Error())
 		w.WriteHeader(err.Code)
 		return nil
 	}
 
 	// If everything was OK, we continue to the next handler
-	return next.ServeHTTP(w, r) // TODO: how to pass additional handlers, like other nexts?
-
-	// TODO: can we also validate responses?
+	return next.ServeHTTP(w, r)
 }
 
 func (v *RequestValidator) validateRequestFromContext(rw http.ResponseWriter, request *http.Request) *httpError {
 
-	// TODO: determine whether this is (still) required when we're checking the servers (again)
-	url, err := url.ParseRequestURI(request.URL.String()[len(v.Prefix):])
+	url, err := determineRequestURL(request, v.Prefix)
 	if err != nil {
 		return &httpError{
 			Code:    http.StatusBadRequest,
-			Message: "error while cutting off prefix",
+			Message: err.Error(),
 		}
 	}
 	method := request.Method
@@ -113,13 +118,14 @@ func (v *RequestValidator) validateRequestFromContext(rw http.ResponseWriter, re
 	if err != nil {
 		switch e := err.(type) {
 		case *openapi3filter.RouteError:
-			// The requested path doesn't match the server, or path, or anything else.
+			// The requested path doesn't match the server, path or anything else.
+			// TODO: switch between cases based on the e.Reason string? Some are not found, some are invalid method, etc.
 			return &httpError{
 				Code:    http.StatusBadRequest,
 				Message: e.Reason,
 			}
 		default:
-			// Provide a fallback in case something unexpected happens
+			// Fallback for unexpected or unimplemented cases
 			return &httpError{
 				Code:    http.StatusInternalServerError,
 				Message: fmt.Sprintf("error validating route: %s", err.Error()),
@@ -138,20 +144,11 @@ func (v *RequestValidator) validateRequestFromContext(rw http.ResponseWriter, re
 		validationInput.ParamDecoder = v.options.ParamDecoder
 	}
 
-	// TODO: can we invalidate additional query parameters? The default behavior does not seem to take additional params into account
+	v.logger.Debug(fmt.Sprintf("%#v", validationInput)) // TODO: output something a little bit nicer?
 
-	// TODO: adapt my code below, used within a project that uses Chi, to use a context, if we need that ... ?
-	// // Pass the Chi context into the request validator, so that any callbacks which it invokes make it available.
-	// ctx := request.Context()
-	// requestContext := context.WithValue(context.Background(), chiContextKey, ctx)
+	// TODO: can we (in)validate additional query parameters? The default behavior does not seem to take additional params into account
 
-	// if v.options != nil {
-	// 	validationInput.Options = &options.Options
-	// 	validationInput.ParamDecoder = options.ParamDecoder
-	// 	requestContext = context.WithValue(requestContext, userDataKey, options.UserData)
-	// }
-
-	requestContext := request.Context()
+	requestContext := request.Context() // TODO: add things to the request context, if required?
 
 	err = openapi3filter.ValidateRequest(requestContext, validationInput)
 	if err != nil {
@@ -171,7 +168,7 @@ func (v *RequestValidator) validateRequestFromContext(rw http.ResponseWriter, re
 				Internal: err,
 			}
 		default:
-			// Provide a fallback in case something unexpected happens
+			// Fallback for unexpected or unimplemented cases
 			return &httpError{
 				Code:     http.StatusInternalServerError,
 				Message:  fmt.Sprintf("error validating request: %s", err),

@@ -16,25 +16,20 @@ package openapi
 
 import (
 	"fmt"
-	"io/ioutil"
-
-	"github.com/getkin/kin-openapi/openapi3"
+	"net/http"
+	"net/url"
+	"strings"
 )
 
-// TODO: add some other functionality for wrapping kin-openapi / swagger functionality, like validation
-
-// readOpenAPISpecification returns the OpenAPI specification corresponding
-func readOpenAPISpecification(path string) (*openapi3.Swagger, error) {
-
-	contents, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
+func determineRequestURL(request *http.Request, prefix string) (*url.URL, error) {
+	// TODO: determine whether this is (still) required when we're checking the servers (again)
+	fullURL := request.URL.String()
+	if !strings.HasPrefix(fullURL, prefix) {
+		return nil, fmt.Errorf("prefix to cut (%s) from URL (%s) is incorrect", prefix, fullURL)
 	}
-
-	openapi, err := openapi3.NewSwaggerLoader().LoadSwaggerFromData(contents)
+	url, err := url.ParseRequestURI(strings.TrimPrefix(fullURL, prefix))
 	if err != nil {
-		return nil, fmt.Errorf("error loading OpenAPI specification: %s", err)
+		return nil, fmt.Errorf("error while cutting off prefix (%s) from URL (%s)", prefix, fullURL)
 	}
-
-	return openapi, nil
+	return url, nil
 }
