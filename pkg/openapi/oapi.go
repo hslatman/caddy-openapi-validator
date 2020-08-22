@@ -15,13 +15,17 @@
 package openapi
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3filter"
 )
 
 // TODO: add some other functionality for wrapping kin-openapi / swagger functionality, like validation
+
+func NoopAuthenticationFunc(context.Context, *openapi3filter.AuthenticationInput) error { return nil }
 
 // readOpenAPISpecification returns the OpenAPI specification corresponding
 func readOpenAPISpecification(path string) (*openapi3.Swagger, error) {

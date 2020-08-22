@@ -31,7 +31,7 @@ Configure the OpenAPI Validator handler as one of the handlers to be executed fi
 
 ## TODO
 
-* Add logging
+* Add tests
 * Improve the example with an actual implementation and more handlers
 * Add other options
 * Look into response validation

@@ -251,6 +251,9 @@ github.com/naoina/go-stringutil
 # github.com/naoina/toml v0.1.1
 github.com/naoina/toml
 github.com/naoina/toml/ast
+# github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
+## explicit
+github.com/oxtoacart/bpool
 # github.com/pkg/errors v0.9.1
 github.com/pkg/errors
 # github.com/rs/xid v1.2.1

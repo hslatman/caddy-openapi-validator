@@ -15,94 +15,14 @@
 package openapi
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/caddyserver/caddy/v2"
-	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
-	"go.uber.org/zap"
 )
 
-func init() {
-	caddy.RegisterModule(RequestValidator{})
-}
-
-// CaddyModule returns the Caddy module information.
-func (RequestValidator) CaddyModule() caddy.ModuleInfo {
-	return caddy.ModuleInfo{
-		ID:  "http.handlers.openapi_request_validator",
-		New: func() caddy.Module { return new(RequestValidator) },
-	}
-}
-
-func NoopAuthenticationFunc(context.Context, *openapi3filter.AuthenticationInput) error { return nil }
-
-// Provision sets up the OpenAPI Validator responder.
-func (v *RequestValidator) Provision(ctx caddy.Context) error {
-
-	v.logger = ctx.Logger(v)
-
-	specification, err := readOpenAPISpecification(v.Filepath)
-	if err != nil {
-		return err
-	}
-	specification.Servers = nil  // TODO: enabled this; or make optional via here or options
-	specification.Security = nil // TODO: enabled this; or make optional via here or options
-	v.specification = specification
-
-	// TODO: validate the specification is a valid spec? Is actually performed via WithSwagger, but can break the program, so we might need to to this in Validate()
-	router := openapi3filter.NewRouter().WithSwagger(v.specification)
-	v.router = router
-
-	v.options = &validatorOptions{
-		Options: openapi3filter.Options{
-			ExcludeRequestBody:    false,
-			ExcludeResponseBody:   false,
-			IncludeResponseStatus: true,
-			AuthenticationFunc:    NoopAuthenticationFunc, // TODO: can we provide an actual one? And how?
-		},
-		//ParamDecoder: ,
-	}
-
-	return nil
-}
-
-// RequestValidator is used to validate OpenAPI requests to an OpenAPI specification
-type RequestValidator struct {
-	specification *openapi3.Swagger
-	options       *validatorOptions
-	router        *openapi3filter.Router
-	logger        *zap.Logger
-
-	// TODO: options to set: enabled/disabled; server checks enabled; security checks enabled
-	// TODO: add option to operate in inspection mode (with logging invalid requests, rather than hard blocking invalid requests; i.e. don't respond)
-
-	// The filepath to the OpenAPI (v3) specification to use
-	Filepath string `json:"filepath,omitempty"`
-	// The prefix to strip off when performing validation
-	Prefix string `json:"prefix,omitempty"`
-}
-
-// ServeHTTP is the Caddy handler for serving HTTP requests
-func (v *RequestValidator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-
-	err := v.validateRequestFromContext(w, r)
-	if err != nil {
-		// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
-		v.logger.Error(err.Error())
-		w.WriteHeader(err.Code)
-		return nil
-	}
-
-	// If everything was OK, we continue to the next handler
-	return next.ServeHTTP(w, r)
-}
-
-func (v *RequestValidator) validateRequestFromContext(rw http.ResponseWriter, request *http.Request) *httpError {
+func (v *Validator) validateRequest(rw http.ResponseWriter, request *http.Request) *httpError {
 
 	url, err := determineRequestURL(request, v.Prefix)
 	if err != nil {
@@ -137,6 +57,7 @@ func (v *RequestValidator) validateRequestFromContext(rw http.ResponseWriter, re
 		Request:    request,
 		PathParams: pathParams,
 		Route:      route,
+		// QueryParams  url.Values
 	}
 
 	if v.options != nil {

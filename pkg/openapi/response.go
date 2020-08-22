@@ -18,90 +18,80 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 )
 
-func init() {
-	caddy.RegisterModule(ResponseValidator{})
-}
+func (v *Validator) validateResponse(rr caddyhttp.ResponseRecorder, request *http.Request) *httpError {
 
-// CaddyModule returns the Caddy module information.
-func (ResponseValidator) CaddyModule() caddy.ModuleInfo {
-	return caddy.ModuleInfo{
-		ID:  "http.handlers.openapi_response_validator",
-		New: func() caddy.Module { return new(ResponseValidator) },
-	}
-}
-
-// Provision sets up the OpenAPI Validator responder.
-func (v *ResponseValidator) Provision(ctx caddy.Context) error {
-
-	specification, err := readOpenAPISpecification(v.Filepath)
+	url, err := determineRequestURL(request, v.Prefix)
 	if err != nil {
-		return err
+		return &httpError{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		}
 	}
-	specification.Servers = nil  // TODO: enabled this; or make optional via here or options
-	specification.Security = nil // TODO: enabled this; or make optional via here or options
-	v.specification = specification
+	method := request.Method
+	route, pathParams, err := v.router.FindRoute(method, url)
 
-	// TODO: validate the specification is a valid spec?
-	router := openapi3filter.NewRouter().WithSwagger(v.specification)
-	v.router = router
-
-	v.options = &validatorOptions{
-		Options: openapi3filter.Options{
-			ExcludeRequestBody:    false,
-			ExcludeResponseBody:   false,
-			IncludeResponseStatus: true,
-			//AuthenticationFunc: ,
-		},
-		//ParamDecoder: ,
-	}
-
-	return nil
-}
-
-// ResponseValidator is used to validate OpenAPI responses to an OpenAPI specification
-type ResponseValidator struct {
-	specification *openapi3.Swagger
-	options       *validatorOptions
-	router        *openapi3filter.Router
-
-	// TODO: options to set: enabled/disabled; server checks enabled; security checks enabled
-	// TODO: add logging
-	// TODO: add option to operate in inspection mode (with logging invalid requests, rather than hard blocking invalid requests)
-
-	// The filepath to the OpenAPI (v3) specification to use
-	Filepath string `json:"filepath,omitempty"`
-	// The prefix to strip off when performing validation
-	Prefix string `json:"prefix,omitempty"`
-}
-
-func (v *ResponseValidator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-
-	err := v.validateResponseFromContext(w, r)
+	// No route found for the request
 	if err != nil {
-		// TODO: we should generate an error response here based on some of the returned data?
-		fmt.Println(err.Error())
-		w.WriteHeader(err.Code)
-		return nil
+		switch e := err.(type) {
+		case *openapi3filter.RouteError:
+			// The requested path doesn't match the server, path or anything else.
+			// TODO: switch between cases based on the e.Reason string? Some are not found, some are invalid method, etc.
+			return &httpError{
+				Code:    http.StatusBadRequest,
+				Message: e.Reason,
+			}
+		default:
+			// Fallback for unexpected or unimplemented cases
+			return &httpError{
+				Code:    http.StatusInternalServerError,
+				Message: fmt.Sprintf("error validating route: %s", err.Error()),
+			}
+		}
 	}
 
-	// If everything was OK, we continue to the next handler
-	return next.ServeHTTP(w, r) // TODO: how to pass additional handlers, like other nexts?
+	requestValidationInput := &openapi3filter.RequestValidationInput{
+		Request:    request,
+		PathParams: pathParams,
+		Route:      route,
+		// QueryParams  url.Values
+	}
 
-	// TODO: can we also validate responses?
-}
+	if v.options != nil {
+		requestValidationInput.Options = &v.options.Options
+		requestValidationInput.ParamDecoder = v.options.ParamDecoder
+	}
 
-func (v *ResponseValidator) validateResponseFromContext(rw http.ResponseWriter, request *http.Request) *httpError {
-	fmt.Println("response validation to be implemented")
+	v.logger.Debug(fmt.Sprintf("%#v", requestValidationInput))
 
-	// TODO: this handler should be after an actual API call; in case of the example PetStore.go API, handled by Caddy, there's already a
-	// status code. This may also be true when calling other APIs. We should make sure that we can (optionally, based on configuration), overrule
-	// the return status code in case the response is not valid according to the API specification (or just log that.)
+	// TODO: use ResponseRecorder functionality? And/or do this in the defer?
+
+	responseValidationInput := &openapi3filter.ResponseValidationInput{
+		RequestValidationInput: requestValidationInput,
+		Status:                 rr.Status(),
+		Header:                 rr.Header(),
+	}
+
+	responseValidationInput.SetBodyBytes(rr.Buffer().Bytes())
+
+	v.logger.Debug(fmt.Sprintf("bytes: %#v", rr.Buffer().Bytes()))
+
+	if v.options != nil {
+		responseValidationInput.Options = &v.options.Options
+	}
+
+	v.logger.Debug(fmt.Sprintf("%#v", responseValidationInput))
+
+	requestContext := request.Context()
+
+	err = openapi3filter.ValidateResponse(requestContext, responseValidationInput)
+	if err != nil {
+		v.logger.Error(err.Error())
+		// TODO: do something with different cases (switch) and return an error (overwrite http status code, if possible?)
+	}
 
 	return nil
 }
