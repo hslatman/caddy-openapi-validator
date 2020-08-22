@@ -22,52 +22,8 @@ import (
 	"github.com/getkin/kin-openapi/openapi3filter"
 )
 
-func (v *Validator) validateResponse(rr caddyhttp.ResponseRecorder, request *http.Request) *httpError {
-
-	url, err := determineRequestURL(request, v.Prefix)
-	if err != nil {
-		return &httpError{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		}
-	}
-	method := request.Method
-	route, pathParams, err := v.router.FindRoute(method, url)
-
-	// No route found for the request
-	if err != nil {
-		switch e := err.(type) {
-		case *openapi3filter.RouteError:
-			// The requested path doesn't match the server, path or anything else.
-			// TODO: switch between cases based on the e.Reason string? Some are not found, some are invalid method, etc.
-			return &httpError{
-				Code:    http.StatusBadRequest,
-				Message: e.Reason,
-			}
-		default:
-			// Fallback for unexpected or unimplemented cases
-			return &httpError{
-				Code:    http.StatusInternalServerError,
-				Message: fmt.Sprintf("error validating route: %s", err.Error()),
-			}
-		}
-	}
-
-	requestValidationInput := &openapi3filter.RequestValidationInput{
-		Request:    request,
-		PathParams: pathParams,
-		Route:      route,
-		// QueryParams  url.Values
-	}
-
-	if v.options != nil {
-		requestValidationInput.Options = &v.options.Options
-		requestValidationInput.ParamDecoder = v.options.ParamDecoder
-	}
-
-	v.logger.Debug(fmt.Sprintf("%#v", requestValidationInput))
-
-	// TODO: use ResponseRecorder functionality? And/or do this in the defer?
+// validateResponse validates an HTTP response against an OpenAPI spec
+func (v *Validator) validateResponse(rr caddyhttp.ResponseRecorder, request *http.Request, requestValidationInput *openapi3filter.RequestValidationInput) *httpError {
 
 	responseValidationInput := &openapi3filter.ResponseValidationInput{
 		RequestValidationInput: requestValidationInput,
@@ -87,7 +43,7 @@ func (v *Validator) validateResponse(rr caddyhttp.ResponseRecorder, request *htt
 
 	requestContext := request.Context()
 
-	err = openapi3filter.ValidateResponse(requestContext, responseValidationInput)
+	err := openapi3filter.ValidateResponse(requestContext, responseValidationInput)
 	if err != nil {
 		v.logger.Error(err.Error())
 		// TODO: do something with different cases (switch) and return an error (overwrite http status code, if possible?)

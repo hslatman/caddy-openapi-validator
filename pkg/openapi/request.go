@@ -22,11 +22,12 @@ import (
 	"github.com/getkin/kin-openapi/openapi3filter"
 )
 
-func (v *Validator) validateRequest(rw http.ResponseWriter, request *http.Request) *httpError {
+// validateRequest validates an HTTP requests according to an OpenAPI spec
+func (v *Validator) validateRequest(rw http.ResponseWriter, request *http.Request) (*openapi3filter.RequestValidationInput, *httpError) {
 
 	url, err := determineRequestURL(request, v.Prefix)
 	if err != nil {
-		return &httpError{
+		return nil, &httpError{
 			Code:    http.StatusBadRequest,
 			Message: err.Error(),
 		}
@@ -40,13 +41,13 @@ func (v *Validator) validateRequest(rw http.ResponseWriter, request *http.Reques
 		case *openapi3filter.RouteError:
 			// The requested path doesn't match the server, path or anything else.
 			// TODO: switch between cases based on the e.Reason string? Some are not found, some are invalid method, etc.
-			return &httpError{
+			return nil, &httpError{
 				Code:    http.StatusBadRequest,
 				Message: e.Reason,
 			}
 		default:
 			// Fallback for unexpected or unimplemented cases
-			return &httpError{
+			return nil, &httpError{
 				Code:    http.StatusInternalServerError,
 				Message: fmt.Sprintf("error validating route: %s", err.Error()),
 			}
@@ -77,20 +78,20 @@ func (v *Validator) validateRequest(rw http.ResponseWriter, request *http.Reques
 		case *openapi3filter.RequestError:
 			// A bad request with a verbose error; splitting it and taking the first
 			errorLines := strings.Split(e.Error(), "\n")
-			return &httpError{
+			return validationInput, &httpError{
 				Code:     http.StatusBadRequest,
 				Message:  errorLines[0],
 				Internal: err,
 			}
 		case *openapi3filter.SecurityRequirementsError:
-			return &httpError{
+			return validationInput, &httpError{
 				Code:     http.StatusForbidden,
 				Message:  e.Error(),
 				Internal: err,
 			}
 		default:
 			// Fallback for unexpected or unimplemented cases
-			return &httpError{
+			return validationInput, &httpError{
 				Code:     http.StatusInternalServerError,
 				Message:  fmt.Sprintf("error validating request: %s", err),
 				Internal: err,
@@ -98,5 +99,5 @@ func (v *Validator) validateRequest(rw http.ResponseWriter, request *http.Reques
 		}
 	}
 
-	return nil
+	return validationInput, nil
 }

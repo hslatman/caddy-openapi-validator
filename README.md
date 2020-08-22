@@ -23,7 +23,8 @@ Configure the OpenAPI Validator handler as one of the handlers to be executed fi
         "handle": [
             {
             "handler": "openapi_validator",
-            "filepath": "examples/petstore.yaml"
+            "filepath": "examples/petstore.yaml",
+            "prefix": "/api"
             }
         ]    
     ...
@@ -34,6 +35,5 @@ Configure the OpenAPI Validator handler as one of the handlers to be executed fi
 * Add tests
 * Improve the example with an actual implementation and more handlers
 * Add other options
-* Look into response validation
 * Look into ways to specify the error nicely
 * Add support for remote API specs?

@@ -91,7 +91,7 @@ func (v *Validator) Provision(ctx caddy.Context) error {
 // ServeHTTP is the Caddy handler for serving HTTP requests
 func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 
-	httpError := v.validateRequest(w, r)
+	requestValidationInput, httpError := v.validateRequest(w, r)
 	if httpError != nil {
 		// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
 		v.logger.Error(httpError.Error())
@@ -107,7 +107,9 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		return true
 	}
 	recorder := caddyhttp.NewResponseRecorder(w, buffer, shouldBuffer)
-	err := next.ServeHTTP(recorder, r) // NOTE: we continue the handler stack
+	
+	// Continue down the handler stack, recording the response, so that we can work with it afterwards
+	err := next.ServeHTTP(recorder, r)
 	if err != nil {
 		return err
 	}
@@ -120,19 +122,21 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	v.logger.Warn(fmt.Sprintf("recorder status: %d", recorder.Status()))
 
 	// TODO: can we validate additional/superfluous fields? And make that configurable? The validator configured now does not seem to do that.
-	httpError = v.validateResponse(recorder, r)
+	httpError = v.validateResponse(recorder, r, requestValidationInput)
 	if httpError != nil {
 		// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
+		// TODO: we might also want to send this information in some other way, like setting a header, only logging, or in response format itself
 		v.logger.Error(httpError.Error())
 		w.WriteHeader(httpError.Code)
 		return nil // TODO: return the actual error here?
 	}
 
-	// TODO: we've wrapped the handler chain and are at the end; if there are errors, we may want to override the response.
-	// status code. This may also be true when calling other APIs. We should make sure that we can (optionally, based on configuration), overrule
-	// the return status code in case the response is not valid according to the API specification (or just log that.)
+	// TODO: we've wrapped the handler chain and are at the end; if there are errors, we may want to override the response and its
+	// status code. This may also be true when calling other APIs (not just for the PetStore API example). 
+	// We should make sure that we can (optionally, based on configuration), overrule the return status code in case the response 
+	// is not valid according to the API specification (or just log that.)
 
-	recorder.WriteResponse() // Actually writes the response; the easy way
+	recorder.WriteResponse() // Actually writes the response (after having buffered the bytes); the easy way
 
 	return nil
 }
