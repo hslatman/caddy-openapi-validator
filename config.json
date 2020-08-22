@@ -30,12 +30,17 @@
                 ],
                 "handle": [
                   {
-                    "handler": "openapi_validator",
+                    "handler": "openapi_request_validator",
                     "filepath": "examples/petstore.yaml",
                     "prefix": "/api"
                   },
                   {
                     "handler": "petstore_api_example"
+                  },
+                  {
+                    "handler": "openapi_response_validator",
+                    "filepath": "examples/petstore.yaml",
+                    "prefix": "/api"
                   }
                 ]
               }

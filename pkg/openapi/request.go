@@ -16,7 +16,6 @@ package openapi
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -28,21 +27,21 @@ import (
 )
 
 func init() {
-	caddy.RegisterModule(Validator{})
+	caddy.RegisterModule(RequestValidator{})
 }
 
 // CaddyModule returns the Caddy module information.
-func (Validator) CaddyModule() caddy.ModuleInfo {
+func (RequestValidator) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
-		ID:  "http.handlers.openapi_validator",
-		New: func() caddy.Module { return new(Validator) },
+		ID:  "http.handlers.openapi_request_validator",
+		New: func() caddy.Module { return new(RequestValidator) },
 	}
 }
 
 // Provision sets up the OpenAPI Validator responder.
-func (v *Validator) Provision(ctx caddy.Context) error {
+func (v *RequestValidator) Provision(ctx caddy.Context) error {
 
-	specification, err := v.getOpenAPISpecification(v.Filepath)
+	specification, err := readOpenAPISpecification(v.Filepath)
 	if err != nil {
 		return err
 	}
@@ -54,11 +53,12 @@ func (v *Validator) Provision(ctx caddy.Context) error {
 	router := openapi3filter.NewRouter().WithSwagger(v.specification)
 	v.router = router
 
-	v.options = &ValidatorOptions{
+	v.options = &validatorOptions{
 		Options: openapi3filter.Options{
 			ExcludeRequestBody:    false,
 			ExcludeResponseBody:   false,
 			IncludeResponseStatus: true,
+			//AuthenticationFunc: ,
 		},
 		//ParamDecoder: ,
 	}
@@ -66,10 +66,10 @@ func (v *Validator) Provision(ctx caddy.Context) error {
 	return nil
 }
 
-// Validator is used to validate OpenAPI requests to an OpenAPI specification
-type Validator struct {
+// RequestValidator is used to validate OpenAPI requests to an OpenAPI specification
+type RequestValidator struct {
 	specification *openapi3.Swagger
-	options       *ValidatorOptions
+	options       *validatorOptions
 	router        *openapi3filter.Router
 
 	// TODO: options to set: enabled/disabled; server checks enabled; security checks enabled
@@ -80,29 +80,7 @@ type Validator struct {
 	Prefix string `json:"prefix,omitempty"`
 }
 
-// ValidatorOptions  are optinos to customize request validation.
-// These are passed through to openapi3filter.
-type ValidatorOptions struct {
-	Options      openapi3filter.Options
-	ParamDecoder openapi3filter.ContentParameterDecoder
-	UserData     interface{}
-}
-
-type httpError struct {
-	Code     int         `json:"-"`
-	Message  interface{} `json:"message"`
-	Internal error       `json:"-"` // Stores the error returned by an external dependency
-}
-
-func (he *httpError) Error() string {
-	if he.Internal != nil {
-		return fmt.Sprintf("code=%d, message=%v, internal=%v", he.Code, he.Message, he.Internal)
-	}
-
-	return fmt.Sprintf("code=%d, message=%v", he.Code, he.Message)
-}
-
-func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+func (v *RequestValidator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 
 	err := v.validateRequestFromContext(w, r)
 	if err != nil {
@@ -118,23 +96,7 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	// TODO: can we also validate responses?
 }
 
-// getOpenAPISpecification returns the OpenAPI specification corresponding
-func (v *Validator) getOpenAPISpecification(path string) (*openapi3.Swagger, error) {
-
-	contents, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	openapi, err := openapi3.NewSwaggerLoader().LoadSwaggerFromData(contents)
-	if err != nil {
-		return nil, fmt.Errorf("error loading OpenAPI specification: %s", err)
-	}
-
-	return openapi, nil
-}
-
-func (v *Validator) validateRequestFromContext(rw http.ResponseWriter, request *http.Request) *httpError {
+func (v *RequestValidator) validateRequestFromContext(rw http.ResponseWriter, request *http.Request) *httpError {
 
 	// TODO: determine whether this is (still) required when we're checking the servers (again)
 	url, err := url.ParseRequestURI(request.URL.String()[len(v.Prefix):])

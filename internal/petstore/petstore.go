@@ -26,5 +26,5 @@ func (p *PetStore) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyh
 	w.Write([]byte("There may be pets here; or not."))
 	w.WriteHeader(200)
 
-	return nil
+	return next.ServeHTTP(w, r)
 }
