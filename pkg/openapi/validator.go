@@ -46,6 +46,16 @@ type Validator struct {
 	Filepath string `json:"filepath,omitempty"`
 	// The prefix to strip off when performing validation
 	Prefix string `json:"prefix,omitempty"`
+	// Indicates whether routes should be validated
+	// When ValidateRequests or ValidateResponses is true, ValidateRoutes should also be true
+	// Default is true
+	ValidateRoutes *bool `json:"validate_routes,omitempty"`
+	// Indicates whether request validation should be enabled
+	// Default is true
+	ValidateRequests *bool `json:"validate_requests,omitempty"`
+	// Indicates whether request validation should be enabled
+	// Default is true
+	ValidateResponses *bool `json:"validate_responses,omitempty"`
 }
 
 // CaddyModule returns the Caddy module information.
@@ -88,17 +98,56 @@ func (v *Validator) Provision(ctx caddy.Context) error {
 	return nil
 }
 
+// Validate validates the configuration of the Validator
+func (v *Validator) Validate() error {
+
+	shouldValidateRoutes := v.ValidateRoutes == nil || *v.ValidateRoutes
+	shouldValidateRequests := v.ValidateRequests == nil || *v.ValidateRequests
+	shouldValidateResponses := v.ValidateResponses == nil || *v.ValidateResponses
+
+	if (shouldValidateRequests || shouldValidateResponses) && !shouldValidateRoutes {
+		return fmt.Errorf("route validation can't be disabled when validation of requests or responses is enabled")
+	}
+
+	return nil
+}
+
 // ServeHTTP is the Caddy handler for serving HTTP requests
 func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 
-	requestValidationInput, httpError := v.validateRequest(w, r)
-	if httpError != nil {
-		// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
-		v.logger.Error(httpError.Error())
-		w.WriteHeader(httpError.Code)
-		return nil // TODO: return the actual error here?
+	var requestValidationInput *openapi3filter.RequestValidationInput = nil
+	var oerr *oapiError = nil
+
+	if v.ValidateRoutes == nil || *v.ValidateRoutes {
+		requestValidationInput, oerr = v.validateRoute(r)
+		if oerr != nil {
+			// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
+			v.logger.Error(oerr.Error())
+			w.WriteHeader(oerr.Code)
+			return nil // TODO: return the actual error here?
+		}
 	}
 
+	if v.ValidateRequests == nil || *v.ValidateRequests {
+		oerr := v.validateRequest(w, r, requestValidationInput)
+		if oerr != nil {
+			// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
+			v.logger.Error(oerr.Error())
+			w.WriteHeader(oerr.Code)
+			return nil // TODO: return the actual error here?
+		}
+	}
+
+	// In case we shouldn't validate responses, we're going to execute the next handler and return early
+	if v.ValidateResponses != nil && !*v.ValidateResponses {
+		err := next.ServeHTTP(w, r)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// In case we should validate responses, we need to record the response and read that before returning the response
 	buffer := v.bufferPool.Get()
 	defer v.bufferPool.Put(buffer)
 
@@ -107,33 +156,31 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		return true
 	}
 	recorder := caddyhttp.NewResponseRecorder(w, buffer, shouldBuffer)
-	
+
 	// Continue down the handler stack, recording the response, so that we can work with it afterwards
 	err := next.ServeHTTP(recorder, r)
 	if err != nil {
 		return err
 	}
 
-	v.logger.Warn(fmt.Sprintf("recorder buffered: %t", recorder.Buffered()))
 	if !recorder.Buffered() {
 		// TODO: do we need to do something with this?
 		//return nil
 	}
-	v.logger.Warn(fmt.Sprintf("recorder status: %d", recorder.Status()))
 
 	// TODO: can we validate additional/superfluous fields? And make that configurable? The validator configured now does not seem to do that.
-	httpError = v.validateResponse(recorder, r, requestValidationInput)
-	if httpError != nil {
+	oerr = v.validateResponse(recorder, r, requestValidationInput)
+	if oerr != nil {
 		// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
 		// TODO: we might also want to send this information in some other way, like setting a header, only logging, or in response format itself
-		v.logger.Error(httpError.Error())
-		w.WriteHeader(httpError.Code)
+		v.logger.Error(oerr.Error())
+		w.WriteHeader(oerr.Code)
 		return nil // TODO: return the actual error here?
 	}
 
 	// TODO: we've wrapped the handler chain and are at the end; if there are errors, we may want to override the response and its
-	// status code. This may also be true when calling other APIs (not just for the PetStore API example). 
-	// We should make sure that we can (optionally, based on configuration), overrule the return status code in case the response 
+	// status code. This may also be true when calling other APIs (not just for the PetStore API example).
+	// We should make sure that we can (optionally, based on configuration), overrule the return status code in case the response
 	// is not valid according to the API specification (or just log that.)
 
 	recorder.WriteResponse() // Actually writes the response (after having buffered the bytes); the easy way

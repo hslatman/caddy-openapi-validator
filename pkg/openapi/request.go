@@ -23,75 +23,34 @@ import (
 )
 
 // validateRequest validates an HTTP requests according to an OpenAPI spec
-func (v *Validator) validateRequest(rw http.ResponseWriter, request *http.Request) (*openapi3filter.RequestValidationInput, *httpError) {
-
-	url, err := determineRequestURL(request, v.Prefix)
-	if err != nil {
-		return nil, &httpError{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		}
-	}
-	method := request.Method
-	route, pathParams, err := v.router.FindRoute(method, url)
-
-	// No route found for the request
-	if err != nil {
-		switch e := err.(type) {
-		case *openapi3filter.RouteError:
-			// The requested path doesn't match the server, path or anything else.
-			// TODO: switch between cases based on the e.Reason string? Some are not found, some are invalid method, etc.
-			return nil, &httpError{
-				Code:    http.StatusBadRequest,
-				Message: e.Reason,
-			}
-		default:
-			// Fallback for unexpected or unimplemented cases
-			return nil, &httpError{
-				Code:    http.StatusInternalServerError,
-				Message: fmt.Sprintf("error validating route: %s", err.Error()),
-			}
-		}
-	}
-
-	validationInput := &openapi3filter.RequestValidationInput{
-		Request:    request,
-		PathParams: pathParams,
-		Route:      route,
-		// QueryParams  url.Values
-	}
-
-	if v.options != nil {
-		validationInput.Options = &v.options.Options
-		validationInput.ParamDecoder = v.options.ParamDecoder
-	}
+func (v *Validator) validateRequest(rw http.ResponseWriter, r *http.Request, validationInput *openapi3filter.RequestValidationInput) *oapiError {
 
 	v.logger.Debug(fmt.Sprintf("%#v", validationInput)) // TODO: output something a little bit nicer?
 
 	// TODO: can we (in)validate additional query parameters? The default behavior does not seem to take additional params into account
 
-	requestContext := request.Context() // TODO: add things to the request context, if required?
+	requestContext := r.Context() // TODO: add things to the request context, if required?
 
-	err = openapi3filter.ValidateRequest(requestContext, validationInput)
+	err := openapi3filter.ValidateRequest(requestContext, validationInput)
 	if err != nil {
 		switch e := err.(type) {
 		case *openapi3filter.RequestError:
 			// A bad request with a verbose error; splitting it and taking the first
 			errorLines := strings.Split(e.Error(), "\n")
-			return validationInput, &httpError{
+			return &oapiError{
 				Code:     http.StatusBadRequest,
 				Message:  errorLines[0],
 				Internal: err,
 			}
 		case *openapi3filter.SecurityRequirementsError:
-			return validationInput, &httpError{
+			return &oapiError{
 				Code:     http.StatusForbidden,
 				Message:  e.Error(),
 				Internal: err,
 			}
 		default:
 			// Fallback for unexpected or unimplemented cases
-			return validationInput, &httpError{
+			return &oapiError{
 				Code:     http.StatusInternalServerError,
 				Message:  fmt.Sprintf("error validating request: %s", err),
 				Internal: err,
@@ -99,5 +58,5 @@ func (v *Validator) validateRequest(rw http.ResponseWriter, request *http.Reques
 		}
 	}
 
-	return validationInput, nil
+	return nil
 }

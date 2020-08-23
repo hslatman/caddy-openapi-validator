@@ -23,7 +23,7 @@ import (
 )
 
 // validateResponse validates an HTTP response against an OpenAPI spec
-func (v *Validator) validateResponse(rr caddyhttp.ResponseRecorder, request *http.Request, requestValidationInput *openapi3filter.RequestValidationInput) *httpError {
+func (v *Validator) validateResponse(rr caddyhttp.ResponseRecorder, request *http.Request, requestValidationInput *openapi3filter.RequestValidationInput) *oapiError {
 
 	responseValidationInput := &openapi3filter.ResponseValidationInput{
 		RequestValidationInput: requestValidationInput,
@@ -32,8 +32,6 @@ func (v *Validator) validateResponse(rr caddyhttp.ResponseRecorder, request *htt
 	}
 
 	responseValidationInput.SetBodyBytes(rr.Buffer().Bytes())
-
-	v.logger.Debug(fmt.Sprintf("bytes: %#v", rr.Buffer().Bytes()))
 
 	if v.options != nil {
 		responseValidationInput.Options = &v.options.Options

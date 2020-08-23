@@ -16,16 +16,16 @@ package openapi
 
 import "fmt"
 
-type httpError struct {
+type oapiError struct {
 	Code     int         `json:"-"`
 	Message  interface{} `json:"message"`
-	Internal error       `json:"-"` // Stores the error returned by an external dependency
+	Internal error       `json:"-"`
 }
 
-func (he *httpError) Error() string {
-	if he.Internal != nil {
-		return fmt.Sprintf("code=%d, message=%v, internal=%v", he.Code, he.Message, he.Internal)
+func (oe *oapiError) Error() string {
+	if oe.Internal != nil {
+		return fmt.Sprintf("code=%d, message=%v, internal=%v", oe.Code, oe.Message, oe.Internal)
 	}
 
-	return fmt.Sprintf("code=%d, message=%v", he.Code, he.Message)
+	return fmt.Sprintf("code=%d, message=%v", oe.Code, oe.Message)
 }
