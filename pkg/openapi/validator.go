@@ -71,6 +71,10 @@ func (v *Validator) Provision(ctx caddy.Context) error {
 
 	v.logger = ctx.Logger(v)
 
+	if v.Filepath == "" {
+		return fmt.Errorf("path to an OpenAPI specification should be provided")
+	}
+
 	specification, err := readOpenAPISpecification(v.Filepath)
 	if err != nil {
 		return err
