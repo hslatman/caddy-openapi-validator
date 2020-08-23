@@ -71,6 +71,7 @@ func (v *Validator) Provision(ctx caddy.Context) error {
 
 	v.logger = ctx.Logger(v)
 
+	// TODO: provide option to continue, even though the file does not exist? Like simply passing on to the next handler, without anything else?
 	if v.Filepath == "" {
 		return fmt.Errorf("path to an OpenAPI specification should be provided")
 	}
@@ -113,6 +114,8 @@ func (v *Validator) Validate() error {
 		return fmt.Errorf("route validation can't be disabled when validation of requests or responses is enabled")
 	}
 
+	// TODO: add functionality (and configuration) for validation of the provided specification
+
 	return nil
 }
 
@@ -142,13 +145,9 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		}
 	}
 
-	// In case we shouldn't validate responses, we're going to execute the next handler and return early
+	// In case we shouldn't validate responses, we're going to execute the next handler and return early (less overhead)
 	if v.ValidateResponses != nil && !*v.ValidateResponses {
-		err := next.ServeHTTP(w, r)
-		if err != nil {
-			return err
-		}
-		return nil
+		return next.ServeHTTP(w, r)
 	}
 
 	// In case we should validate responses, we need to record the response and read that before returning the response
