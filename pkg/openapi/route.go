@@ -21,16 +21,18 @@ import (
 	"github.com/getkin/kin-openapi/openapi3filter"
 )
 
-// validateRoute
-func (v *Validator) validateRoute(request *http.Request) (*openapi3filter.RequestValidationInput, *oapiError) {
-	url, err := determineRequestURL(request, v.Prefix)
-	if err != nil {
-		return nil, &oapiError{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		}
+// validateRoute checks whether a route with the right properties (server, path, method) can be found
+func (v *Validator) validateRoute(r *http.Request) (*openapi3filter.RequestValidationInput, *oapiError) {
+
+	url := r.URL
+	url.Host = r.Host // TODO: verify this is an OK thing to do (i.e. what about proxies? Other protocols?)
+	if r.TLS == nil {
+		url.Scheme = "http"
+	} else {
+		url.Scheme = "https"
 	}
-	method := request.Method
+
+	method := r.Method
 	route, pathParams, err := v.router.FindRoute(method, url)
 
 	// No route found for the request
@@ -53,7 +55,7 @@ func (v *Validator) validateRoute(request *http.Request) (*openapi3filter.Reques
 	}
 
 	validationInput := &openapi3filter.RequestValidationInput{
-		Request:    request,
+		Request:    r,
 		PathParams: pathParams,
 		Route:      route,
 		// QueryParams  url.Values

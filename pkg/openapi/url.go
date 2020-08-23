@@ -21,6 +21,7 @@ import (
 	"strings"
 )
 
+// NOTE: currently unused
 func determineRequestURL(request *http.Request, prefix string) (*url.URL, error) {
 	// TODO: determine whether this is (still) required when we're checking the servers (again)
 	fullURL := request.URL.String()
@@ -31,5 +32,6 @@ func determineRequestURL(request *http.Request, prefix string) (*url.URL, error)
 	if err != nil {
 		return nil, fmt.Errorf("error while cutting off prefix (%s) from URL (%s)", prefix, fullURL)
 	}
+	fmt.Println(fmt.Sprintf("cut off url: %s", url.String()))
 	return url, nil
 }

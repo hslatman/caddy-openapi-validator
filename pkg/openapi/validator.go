@@ -39,13 +39,11 @@ type Validator struct {
 	logger        *zap.Logger
 	bufferPool    *bpool.BufferPool
 
-	// TODO: options to set: enabled/disabled; server checks enabled; security checks enabled
+	// TODO: options to set: enabled/disabled; security checks enabled
 	// TODO: add option to operate in inspection mode (with logging invalid requests, rather than hard blocking invalid requests; i.e. don't respond)
 
 	// The filepath to the OpenAPI (v3) specification to use
 	Filepath string `json:"filepath,omitempty"`
-	// The prefix to strip off when performing validation
-	Prefix string `json:"prefix,omitempty"`
 	// Indicates whether routes should be validated
 	// When ValidateRequests or ValidateResponses is true, ValidateRoutes should also be true
 	// Default is true
@@ -56,6 +54,8 @@ type Validator struct {
 	// Indicates whether request validation should be enabled
 	// Default is true
 	ValidateResponses *bool `json:"validate_responses,omitempty"`
+
+	// TODO: some option to add/override server / disable the server check
 }
 
 // CaddyModule returns the Caddy module information.
@@ -75,8 +75,8 @@ func (v *Validator) Provision(ctx caddy.Context) error {
 	if err != nil {
 		return err
 	}
-	specification.Servers = nil  // TODO: enabled this; or make optional via here or options
-	specification.Security = nil // TODO: enabled this; or make optional via here or options
+	//specification.Servers = nil  // TODO: make it possible to configure this
+	//specification.Security = nil // TODO: make it possible to configure this
 	v.specification = specification
 
 	// TODO: validate the specification is a valid spec? Is actually performed via WithSwagger, but can break the program, so we might need to to this in Validate()
