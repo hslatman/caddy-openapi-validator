@@ -187,3 +187,10 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 
 	return nil
 }
+
+var (
+	_ caddy.Module                = (*Validator)(nil)
+	_ caddy.Provisioner           = (*Validator)(nil)
+	_ caddy.Validator             = (*Validator)(nil)
+	_ caddyhttp.MiddlewareHandler = (*Validator)(nil)
+)
