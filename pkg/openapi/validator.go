@@ -93,7 +93,7 @@ func (v *Validator) Provision(ctx caddy.Context) error {
 			ExcludeRequestBody:    false,
 			ExcludeResponseBody:   false,
 			IncludeResponseStatus: true,
-			AuthenticationFunc:    NoopAuthenticationFunc, // TODO: can we provide an actual one? And how?
+			AuthenticationFunc:    NoopAuthenticationFunc, // TODO: can we provide an actual one? Should we? And how?
 		},
 		//ParamDecoder: ,
 	}
@@ -186,9 +186,7 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	// We should make sure that we can (optionally, based on configuration), overrule the return status code in case the response
 	// is not valid according to the API specification (or just log that.)
 
-	recorder.WriteResponse() // Actually writes the response (after having buffered the bytes); the easy way
-
-	return nil
+	return recorder.WriteResponse() // Actually writes the response (after having buffered the bytes) the easy way; returning underlying errors (if any)
 }
 
 var (

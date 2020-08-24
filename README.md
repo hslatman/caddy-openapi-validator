@@ -1,6 +1,6 @@
-# Caddy OpenAPI Validator
+# Caddy OpenAPI Validator (WIP)
 
-A [Caddy](https://caddyserver.com/) module that validates requests and responses against an OpenAPI specification.
+A (WIP) [Caddy](https://caddyserver.com/) module that validates requests and responses against a local OpenAPI specification.
 
 ## Description
 
@@ -45,7 +45,7 @@ The `filepath` configuration is required; without it, or when pointing to a non-
 This repository contains an example of using the OpenAPI Validator with the `Swagger Petstore` specification.
 A minimal (and incomplete) implementation of the API is provided in `internal/petstore/petstore.go`, which only exists for demo purposes.
 The `config.json` file is a Caddy configuration file in JSON format.
-It configures Caddy to serve the PetStore API with OpenAPI validation, TLS and logging enabled.
+It configures Caddy to serve the PetStore API with OpenAPI validation, TLS and logging enabled on https://localhost:9443/api.
 The example can be used like below:
 
 ```bash
@@ -63,5 +63,5 @@ $ ./main run --config config.json
 * Improve the example with more (and correct) handlers
 * Add an example that uses an HTTP proxy/fcgi configuration
 * Add other options, including security validation and server override
-* Look into ways to specify the error nicely
+* Look into ways to specify the error nicely, instead of just logging it
 * Add support for remote API specs?
