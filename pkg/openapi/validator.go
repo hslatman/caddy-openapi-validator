@@ -31,7 +31,7 @@ func init() {
 	caddy.RegisterModule(Validator{})
 }
 
-// Validator is used to validate OpenAPI requests and responses to an OpenAPI specification
+// Validator is used to validate OpenAPI requests and responses against an OpenAPI specification
 type Validator struct {
 	specification *openapi3.Swagger
 	options       *validatorOptions

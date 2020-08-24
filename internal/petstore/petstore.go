@@ -12,16 +12,18 @@ func init() {
 	caddy.RegisterModule(PetStore{})
 }
 
+// PetStore struct keeping module data
 type PetStore struct {
 }
 
 type pet struct {
-	Id   int    `json:"id"`
+	ID   int    `json:"id"`
 	Name string `json:"name"`
 	Tag  string `json:"tag,omitempty"`
 	//Additional string `json:"additional"`
 }
 
+// CaddyModule defines the PetStore module
 func (PetStore) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
 		ID:  "http.handlers.petstore_api_example",
@@ -29,13 +31,14 @@ func (PetStore) CaddyModule() caddy.ModuleInfo {
 	}
 }
 
+// ServeHTTP serves a simple (and currently incomplete) Pet Store API
 func (p *PetStore) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 
 	// TODO: provide a bit more realistic data that actually conforms to the OpenAPI specification?
 	w.Header().Set("Content-Type", "application/json")
 
 	pet1 := pet{
-		Id:   1,
+		ID:   1,
 		Name: "Pet 1",
 		//Additional: "this should trigger an error",
 	}

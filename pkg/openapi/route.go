@@ -24,6 +24,7 @@ import (
 // validateRoute checks whether a route with the right properties (server, path, method) can be found
 func (v *Validator) validateRoute(r *http.Request) (*openapi3filter.RequestValidationInput, *oapiError) {
 
+	// Reconstruct the url from the request; makes it work for localhost
 	url := r.URL
 	url.Host = r.Host // TODO: verify this is an OK thing to do (i.e. what about proxies? Other protocols?)
 	if r.TLS == nil {
