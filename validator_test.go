@@ -29,11 +29,10 @@ func createValidator(t *testing.T) (*Validator, error) {
 		ValidateResponses: &boolValue,
 	}
 
-	//context := caddy.Context{}
-	//validator.Provision(context)
+	// NOTE: we're performing the Provision() steps manually here, because there's a lot going on under the hood of Caddy
 	validator.logger = zaptest.NewLogger(t)
 	validator.bufferPool = bpool.NewBufferPool(64)
-	err = validator.prepareOpenAPISpec()
+	err = validator.prepareOpenAPISpecification()
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +138,7 @@ func TestServeHTTP(t *testing.T) {
 	}
 
 	//t.Log(fmt.Sprintf("%#v", recorder))
-
-	t.Fail()
+	//t.Fail()
 
 	// TODO: more tests?
 }

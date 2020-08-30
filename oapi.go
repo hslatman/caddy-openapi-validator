@@ -25,6 +25,7 @@ import (
 
 // TODO: add some other functionality for wrapping kin-openapi / swagger functionality, like validation
 
+// NoopAuthenticationFunc is an AuthenticationFunc used for mocking/disabling auth checks
 func NoopAuthenticationFunc(context.Context, *openapi3filter.AuthenticationInput) error { return nil }
 
 // readOpenAPISpecification returns the OpenAPI specification corresponding
