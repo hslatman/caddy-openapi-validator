@@ -66,7 +66,8 @@ I only recently started using Caddy, so there may be some rough edges to iron ou
 A small and incomplete list of potential things to implement, improve and think about:
 
 * Add tests for the OpenAPI Validator functionality and configuration
-* Add configuration using directives
+* Enforce correct APIs (instead of just logging wrong ones) if configured to do so
+* Add configuration using directives?
 * Improve the example with more (and correct) handlers
 * Add an example that uses an HTTP proxy/fcgi configuration
 * Add other options, including security validation and server override

@@ -71,34 +71,12 @@ func (v *Validator) Provision(ctx caddy.Context) error {
 
 	v.logger = ctx.Logger(v)
 
-	// TODO: provide option to continue, even though the file does not exist? Like simply passing on to the next handler, without anything else?
-	if v.Filepath == "" {
-		return fmt.Errorf("path to an OpenAPI specification should be provided")
-	}
+	v.bufferPool = bpool.NewBufferPool(64)
 
-	specification, err := readOpenAPISpecification(v.Filepath)
+	err := v.prepareOpenAPISpecification()
 	if err != nil {
 		return err
 	}
-	//specification.Servers = nil  // TODO: make it possible to configure this
-	//specification.Security = nil // TODO: make it possible to configure this
-	v.specification = specification
-
-	// TODO: validate the specification is a valid spec? Is actually performed via WithSwagger, but can break the program, so we might need to to this in Validate()
-	router := openapi3filter.NewRouter().WithSwagger(v.specification)
-	v.router = router
-
-	v.options = &validatorOptions{
-		Options: openapi3filter.Options{
-			ExcludeRequestBody:    false,
-			ExcludeResponseBody:   false,
-			IncludeResponseStatus: true,
-			AuthenticationFunc:    NoopAuthenticationFunc, // TODO: can we provide an actual one? Should we? And how?
-		},
-		//ParamDecoder: ,
-	}
-
-	v.bufferPool = bpool.NewBufferPool(64)
 
 	return nil
 }
@@ -187,6 +165,38 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	// is not valid according to the API specification (or just log that.)
 
 	return recorder.WriteResponse() // Actually writes the response (after having buffered the bytes) the easy way; returning underlying errors (if any)
+}
+
+func (v *Validator) prepareOpenAPISpecification() error {
+
+	// TODO: provide option to continue, even though the file does not exist? Like simply passing on to the next handler, without anything else?
+	if v.Filepath == "" {
+		return fmt.Errorf("path to an OpenAPI specification should be provided")
+	}
+
+	specification, err := readOpenAPISpecification(v.Filepath)
+	if err != nil {
+		return err
+	}
+	//specification.Servers = nil  // TODO: make it possible to configure this
+	//specification.Security = nil // TODO: make it possible to configure this
+	v.specification = specification
+
+	// TODO: validate the specification is a valid spec? Is actually performed via WithSwagger, but can break the program, so we might need to to this in Validate()
+	router := openapi3filter.NewRouter().WithSwagger(v.specification)
+	v.router = router
+
+	v.options = &validatorOptions{
+		Options: openapi3filter.Options{
+			ExcludeRequestBody:    false,
+			ExcludeResponseBody:   false,
+			IncludeResponseStatus: true,
+			AuthenticationFunc:    NoopAuthenticationFunc, // TODO: can we provide an actual one? Should we? And how?
+		},
+		//ParamDecoder: ,
+	}
+
+	return nil
 }
 
 var (
