@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path"
 	"testing"
 
 	"github.com/caddyserver/caddy/v2"
@@ -16,14 +14,9 @@ import (
 
 func createValidator(t *testing.T) (*Validator, error) {
 
-	d, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
 	boolValue := true
 	validator := &Validator{
-		Filepath:          path.Join(d, "examples/petstore.yaml"), // TODO: provide spec as string for testing purposes?
+		Filepath:          "examples/petstore.yaml",
 		ValidateRoutes:    &boolValue,
 		ValidateRequests:  &boolValue,
 		ValidateResponses: &boolValue,
@@ -32,7 +25,7 @@ func createValidator(t *testing.T) (*Validator, error) {
 	// NOTE: we're performing the Provision() steps manually here, because there's a lot going on under the hood of Caddy
 	validator.logger = zaptest.NewLogger(t)
 	validator.bufferPool = bpool.NewBufferPool(64)
-	err = validator.prepareOpenAPISpecification()
+	err := validator.prepareOpenAPISpecification()
 	if err != nil {
 		return nil, err
 	}

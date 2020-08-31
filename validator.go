@@ -171,10 +171,10 @@ func (v *Validator) prepareOpenAPISpecification() error {
 
 	// TODO: provide option to continue, even though the file does not exist? Like simply passing on to the next handler, without anything else?
 	if v.Filepath == "" {
-		return fmt.Errorf("path to an OpenAPI specification should be provided")
+		return fmt.Errorf("path/URI to an OpenAPI specification should be provided")
 	}
 
-	specification, err := readOpenAPISpecification(v.Filepath)
+	specification, err := readOpenAPISpecification(v.Filepath) // TODO: make this lazy (and/or cache when loaded from URI?)
 	if err != nil {
 		return err
 	}

@@ -17,7 +17,8 @@ package openapi
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"net/url"
+	"os"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
@@ -31,14 +32,27 @@ func NoopAuthenticationFunc(context.Context, *openapi3filter.AuthenticationInput
 // readOpenAPISpecification returns the OpenAPI specification corresponding
 func readOpenAPISpecification(path string) (*openapi3.Swagger, error) {
 
-	contents, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
+	var openapi *openapi3.Swagger
+	uri, err := url.Parse(path)
+	if err == nil {
+		openapi, err = openapi3.NewSwaggerLoader().LoadSwaggerFromURI(uri)
+		if err != nil {
+			return nil, fmt.Errorf("error loading OpenAPI specification: %s", err)
+		}
+	} else {
+		p := path
+		_, err := os.Stat(p)
+		if err != nil || !os.IsExist(err) {
+			return nil, err
+		}
+		openapi, err = openapi3.NewSwaggerLoader().LoadSwaggerFromFile(p)
+		if err != nil {
+			return nil, fmt.Errorf("error loading OpenAPI specification: %s", err)
+		}
 	}
 
-	openapi, err := openapi3.NewSwaggerLoader().LoadSwaggerFromData(contents)
-	if err != nil {
-		return nil, fmt.Errorf("error loading OpenAPI specification: %s", err)
+	if openapi == nil { // fallback to an error in case openapi is nil
+		return nil, fmt.Errorf("loading OpenAPI specification failed")
 	}
 
 	return openapi, nil
