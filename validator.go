@@ -21,6 +21,8 @@ import (
 	"github.com/oxtoacart/bpool"
 
 	"github.com/caddyserver/caddy/v2"
+	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
+	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
@@ -29,6 +31,7 @@ import (
 
 func init() {
 	caddy.RegisterModule(Validator{})
+	httpcaddyfile.RegisterHandlerDirective("openapi_validator", parseCaddyfile)
 }
 
 // Validator is used to validate OpenAPI requests and responses against an OpenAPI specification
@@ -70,6 +73,7 @@ func (Validator) CaddyModule() caddy.ModuleInfo {
 func (v *Validator) Provision(ctx caddy.Context) error {
 
 	v.logger = ctx.Logger(v)
+	defer v.logger.Sync()
 
 	v.bufferPool = bpool.NewBufferPool(64)
 
@@ -203,5 +207,6 @@ var (
 	_ caddy.Module                = (*Validator)(nil)
 	_ caddy.Provisioner           = (*Validator)(nil)
 	_ caddy.Validator             = (*Validator)(nil)
+	_ caddyfile.Unmarshaler       = (*Validator)(nil)
 	_ caddyhttp.MiddlewareHandler = (*Validator)(nil)
 )
