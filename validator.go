@@ -34,6 +34,13 @@ func init() {
 	httpcaddyfile.RegisterHandlerDirective("openapi_validator", parseCaddyfile)
 }
 
+const (
+	// ReplacerOpenAPIValidatorErrorMessage is a Caddy Replacer key for storing OpenAPI validation error messages
+	ReplacerOpenAPIValidatorErrorMessage = "openapi_validator.error_message"
+	// ReplacerOpenAPIValidatorStatusCode is a Caddy Replacer key for storing a status code
+	ReplacerOpenAPIValidatorStatusCode = "openapi_validator.status_code"
+)
+
 // Validator is used to validate OpenAPI requests and responses against an OpenAPI specification
 type Validator struct {
 	specification *openapi3.Swagger
@@ -57,6 +64,10 @@ type Validator struct {
 	// Indicates whether request validation should be enabled
 	// Default is true
 	ValidateResponses *bool `json:"validate_responses,omitempty"`
+	// Indicates whether the OpenAPI specification should be enforced, meaning that invalid
+	// requests and responses will be filtered and an (appropriate) status is returned
+	// Default is true
+	Enforce *bool `json:"enforce,omitempty"`
 
 	// TODO: some option to add/override server / disable the server check
 }
@@ -107,13 +118,24 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	var requestValidationInput *openapi3filter.RequestValidationInput = nil
 	var oerr *oapiError = nil
 
+	replacer := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
+	replacer.Set(ReplacerOpenAPIValidatorErrorMessage, "")
+	replacer.Set(ReplacerOpenAPIValidatorStatusCode, -1)
+
 	if v.ValidateRoutes == nil || *v.ValidateRoutes {
 		requestValidationInput, oerr = v.validateRoute(r)
 		if oerr != nil {
 			// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
 			v.logger.Error(oerr.Error())
-			w.WriteHeader(oerr.Code)
-			return nil // TODO: return the actual error here?
+
+			replacer.Set(ReplacerOpenAPIValidatorErrorMessage, oerr.Error())
+			replacer.Set(ReplacerOpenAPIValidatorStatusCode, oerr.Code)
+
+			if v.shouldEnforce() {
+				w.Header().Set("Content-Type", "application/json") // TODO: set the proper type, based on Accept header?
+				w.WriteHeader(oerr.Code)                           // TODO: find out if this is required; it seems it is.
+				return oerr
+			}
 		}
 	}
 
@@ -122,8 +144,15 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		if oerr != nil {
 			// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
 			v.logger.Error(oerr.Error())
-			w.WriteHeader(oerr.Code)
-			return nil // TODO: return the actual error here?
+
+			replacer.Set(ReplacerOpenAPIValidatorErrorMessage, oerr.Error())
+			replacer.Set(ReplacerOpenAPIValidatorStatusCode, oerr.Code)
+
+			if v.shouldEnforce() {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(oerr.Code)
+				return oerr
+			}
 		}
 	}
 
@@ -159,8 +188,15 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
 		// TODO: we might also want to send this information in some other way, like setting a header, only logging, or in response format itself
 		v.logger.Error(oerr.Error())
-		w.WriteHeader(oerr.Code)
-		return nil // TODO: return the actual error here?
+
+		replacer.Set(ReplacerOpenAPIValidatorErrorMessage, oerr.Error())
+		replacer.Set(ReplacerOpenAPIValidatorStatusCode, oerr.Code)
+
+		if v.shouldEnforce() {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(oerr.Code)
+			return oerr
+		}
 	}
 
 	// TODO: we've wrapped the handler chain and are at the end; if there are errors, we may want to override the response and its
@@ -201,6 +237,10 @@ func (v *Validator) prepareOpenAPISpecification() error {
 	}
 
 	return nil
+}
+
+func (v *Validator) shouldEnforce() bool {
+	return v.Enforce == nil || *v.Enforce
 }
 
 var (

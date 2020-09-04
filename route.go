@@ -43,7 +43,7 @@ func (v *Validator) validateRoute(r *http.Request) (*openapi3filter.RequestValid
 			// The requested path doesn't match the server, path or anything else.
 			// TODO: switch between cases based on the e.Reason string? Some are not found, some are invalid method, etc.
 			return nil, &oapiError{
-				Code:    http.StatusBadRequest,
+				Code:    http.StatusNotFound, //http.StatusBadRequest,
 				Message: e.Reason,
 			}
 		default:

@@ -17,6 +17,7 @@ package openapi
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/getkin/kin-openapi/openapi3filter"
@@ -43,8 +44,24 @@ func (v *Validator) validateResponse(rr caddyhttp.ResponseRecorder, request *htt
 
 	err := openapi3filter.ValidateResponse(requestContext, responseValidationInput)
 	if err != nil {
-		v.logger.Error(err.Error())
 		// TODO: do something with different cases (switch) and return an error (overwrite http status code, if possible?)
+		switch e := err.(type) {
+		case *openapi3filter.ResponseError:
+			// A bad response with a verbose error; splitting it and taking the first line
+			errorLines := strings.Split(e.Error(), "\n")
+			return &oapiError{
+				Code:     http.StatusInternalServerError,
+				Message:  errorLines[0],
+				Internal: err,
+			}
+		default:
+			// Fallback for unexpected or unimplemented cases
+			return &oapiError{
+				Code:     http.StatusInternalServerError,
+				Message:  fmt.Sprintf("error validating response: %s", err),
+				Internal: err,
+			}
+		}
 	}
 
 	return nil

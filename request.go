@@ -35,7 +35,7 @@ func (v *Validator) validateRequest(rw http.ResponseWriter, r *http.Request, val
 	if err != nil {
 		switch e := err.(type) {
 		case *openapi3filter.RequestError:
-			// A bad request with a verbose error; splitting it and taking the first
+			// A bad request with a verbose error; splitting it and taking the first line
 			errorLines := strings.Split(e.Error(), "\n")
 			return &oapiError{
 				Code:     http.StatusBadRequest,

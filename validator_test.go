@@ -3,6 +3,7 @@ package openapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -20,6 +21,7 @@ func createValidator(t *testing.T) (*Validator, error) {
 		ValidateRoutes:    &boolValue,
 		ValidateRequests:  &boolValue,
 		ValidateResponses: &boolValue,
+		Enforce:           &boolValue,
 	}
 
 	// NOTE: we're performing the Provision() steps manually here, because there's a lot going on under the hood of Caddy
@@ -106,7 +108,7 @@ func TestServeHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req, err := prepareRequest("GET", "http://localhost:9443/api/pets/1")
+	req, err := prepareRequest("GET", "http://localhost:9443/api/petz/1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,24 +116,52 @@ func TestServeHTTP(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
 	mock := &mockAPI{}
+
 	err = v.ServeHTTP(recorder, req, mock)
-	if err != nil {
-		t.Error(err)
+	if err == nil { // TODO: add tests with non-enforcement (i.e. no error expected)
+		t.Error("expected an error while enforcing route validation")
 	}
 
-	if status := recorder.Code; status != http.StatusOK {
+	if status := recorder.Code; status != http.StatusNotFound {
 		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusOK)
+			status, http.StatusNotFound)
 	}
 
 	expectedContentTypeHeader := "application/json"
 	if contentTypeHeader := recorder.Header().Get("Content-Type"); contentTypeHeader != expectedContentTypeHeader {
-		t.Errorf("handler returned unexpected content-type header: got %v want %v",
+		t.Errorf("handler returned unexpected content-type header: got '%v' want '%v'",
 			recorder.Header().Get("Content-Type"), expectedContentTypeHeader)
 	}
 
-	//t.Log(fmt.Sprintf("%#v", recorder))
-	//t.Fail()
+	t.Log(fmt.Sprintf("%#v", recorder))
 
+	req, err = prepareRequest("GET", "http://localhost:9443/api/pets/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// TODO: split tests
+
+	recorder = httptest.NewRecorder()
+
+	err = v.ServeHTTP(recorder, req, mock)
+	if err == nil {
+		t.Error("expected an error while enforcing response validation")
+	}
+
+	if status := recorder.Code; status != http.StatusInternalServerError {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusInternalServerError)
+	}
+
+	expectedContentTypeHeader = "application/json"
+	if contentTypeHeader := recorder.Header().Get("Content-Type"); contentTypeHeader != expectedContentTypeHeader {
+		t.Errorf("handler returned unexpected content-type header: got '%v' want '%v'",
+			recorder.Header().Get("Content-Type"), expectedContentTypeHeader)
+	}
+
+	t.Log(fmt.Sprintf("%#v", recorder))
+
+	//t.Fail()
 	// TODO: more tests?
 }
