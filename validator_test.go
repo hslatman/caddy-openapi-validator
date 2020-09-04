@@ -36,6 +36,7 @@ func createValidator(t *testing.T) (*Validator, error) {
 		ValidateRequests:  &boolValue,
 		ValidateResponses: &boolValue,
 		Enforce:           &boolValue,
+		Log:               &boolValue,
 	}
 
 	// NOTE: we're performing the Provision() steps manually here, because there's a lot going on under the hood of Caddy

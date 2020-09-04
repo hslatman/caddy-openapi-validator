@@ -49,9 +49,6 @@ type Validator struct {
 	logger        *zap.Logger
 	bufferPool    *bpool.BufferPool
 
-	// TODO: options to set: enabled/disabled; security checks enabled
-	// TODO: add option to operate in inspection mode (with logging invalid requests, rather than hard blocking invalid requests; i.e. don't respond)
-
 	// The filepath to the OpenAPI (v3) specification to use
 	Filepath string `json:"filepath,omitempty"`
 	// Indicates whether routes should be validated
@@ -68,6 +65,9 @@ type Validator struct {
 	// requests and responses will be filtered and an (appropriate) status is returned
 	// Default is true
 	Enforce *bool `json:"enforce,omitempty"`
+	// To log or not to log
+	// Default is true
+	Log *bool `json:"log,omitempty"`
 
 	// TODO: some option to add/override server / disable the server check
 }
@@ -125,9 +125,9 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	if v.ValidateRoutes == nil || *v.ValidateRoutes {
 		requestValidationInput, oerr = v.validateRoute(r)
 		if oerr != nil {
-			// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
-			v.logger.Error(oerr.Error())
+			v.logError(oerr)
 
+			// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
 			replacer.Set(ReplacerOpenAPIValidatorErrorMessage, oerr.Error())
 			replacer.Set(ReplacerOpenAPIValidatorStatusCode, oerr.Code)
 
@@ -142,9 +142,9 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	if v.ValidateRequests == nil || *v.ValidateRequests {
 		oerr := v.validateRequest(w, r, requestValidationInput)
 		if oerr != nil {
-			// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
-			v.logger.Error(oerr.Error())
+			v.logError(oerr)
 
+			// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
 			replacer.Set(ReplacerOpenAPIValidatorErrorMessage, oerr.Error())
 			replacer.Set(ReplacerOpenAPIValidatorStatusCode, oerr.Code)
 
@@ -187,7 +187,8 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	if oerr != nil {
 		// TODO: we should generate an error response here based on some of the returned data? in what format? (configured or via accept headers?)
 		// TODO: we might also want to send this information in some other way, like setting a header, only logging, or in response format itself
-		v.logger.Error(oerr.Error())
+
+		v.logError(oerr)
 
 		replacer.Set(ReplacerOpenAPIValidatorErrorMessage, oerr.Error())
 		replacer.Set(ReplacerOpenAPIValidatorStatusCode, oerr.Code)
@@ -241,6 +242,13 @@ func (v *Validator) prepareOpenAPISpecification() error {
 
 func (v *Validator) shouldEnforce() bool {
 	return v.Enforce == nil || *v.Enforce
+}
+
+func (v *Validator) logError(err error) {
+	if v.Log == nil || *v.Log {
+		v.logger.Error(err.Error())
+		v.logger.Sync()
+	}
 }
 
 var (
