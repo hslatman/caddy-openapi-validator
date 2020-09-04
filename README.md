@@ -1,6 +1,6 @@
 # Caddy OpenAPI Validator (WIP)
 
-A (WIP) [Caddy](https://caddyserver.com/) module that validates requests and responses against an [OpenAPI](https://www.openapis.org/) specification.
+A [Caddy](https://caddyserver.com/) module that validates requests and responses against an [OpenAPI](https://www.openapis.org/) specification.
 
 ## Description
 
@@ -42,7 +42,8 @@ Configure the OpenAPI Validator handler as one of the handlers to be executed by
                 "filepath": "examples/petstore.yaml",
                 "validate_routes": true,
                 "validate_requests": true,
-                "validate_responses": true
+                "validate_responses": true,
+                "enforce": true
             }
         ]
     ...
@@ -65,11 +66,8 @@ I only recently started using Caddy, so there may be some rough edges to iron ou
 
 A small and incomplete list of potential things to implement, improve and think about:
 
-* Add tests for the OpenAPI Validator functionality and configuration
-* Enforce correct APIs (instead of just logging wrong ones) if configured to do so
-* Add configuration using directives?
-* Improve the example with more (and correct) handlers
+* Add more tests for the OpenAPI Validator functionality and configuration
+* Improve Caddyfile handling (e.g. add more subdirectives)
 * Add an example that uses an HTTP proxy/fcgi configuration
-* Add other options, including security validation and server override
+* Add other options to configuration, including security validation and server override
 * Look into ways to specify the error nicely, instead of just logging it (e.g. return error message(s) in specific format)
-* Add support for remote API specs?
