@@ -180,6 +180,39 @@ func TestNonExistingRoute(t *testing.T) {
 	t.Log(fmt.Sprintf("%#v", recorder))
 }
 
+// TODO: can we validate query parameters?
+// func TestWrongQueryParameter(t *testing.T) {
+
+// 	v, err := createValidator(t)
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+
+// 	// The request has a typo in the route; it does not exist
+// 	req, err := prepareRequest("GET", "http://localhost:9443/api/pets?limis=10#bla")
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+
+// 	recorder := httptest.NewRecorder()
+
+// 	mock := &mockAPI{}
+
+// 	err = v.ServeHTTP(recorder, req, mock)
+// 	if err == nil { // TODO: add tests with non-enforcement (i.e. no error expected)
+// 		t.Error("expected an error while enforcing route validation")
+// 	}
+
+// 	if status := recorder.Code; status != http.StatusNotFound {
+// 		t.Errorf("handler returned wrong status code: got %v want %v",
+// 			status, http.StatusNotFound)
+// 	}
+
+// 	t.Log(fmt.Sprintf("%#v", recorder))
+
+// 	//t.Fail()
+// }
+
 func TestWrongSchemaInResponse(t *testing.T) {
 
 	v, err := createValidator(t)

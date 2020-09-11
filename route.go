@@ -56,9 +56,10 @@ func (v *Validator) validateRoute(r *http.Request) (*openapi3filter.RequestValid
 	}
 
 	validationInput := &openapi3filter.RequestValidationInput{
-		Request:    r,
-		PathParams: pathParams,
-		Route:      route,
+		Request:     r,
+		PathParams:  pathParams,
+		Route:       route,
+		QueryParams: r.URL.Query(),
 		// QueryParams  url.Values
 	}
 
