@@ -85,7 +85,7 @@ type pet struct {
 	Tag  string `json:"tag,omitempty"`
 }
 
-// ServeHTTP serves a mock Pet Store API for testing purposes
+// ServeHTTP serves an API with wrong responses
 func (m *mockWrongAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 
 	w.Header().Set("Content-Type", "application/json")
@@ -151,12 +151,13 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestServeHTTP(t *testing.T) {
+func TestNonExistingRoute(t *testing.T) {
 	v, err := createValidator(t)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// The request has a typo in the route; it does not exist
 	req, err := prepareRequest("GET", "http://localhost:9443/api/petz/1")
 	if err != nil {
 		t.Fatal(err)
@@ -176,22 +177,24 @@ func TestServeHTTP(t *testing.T) {
 			status, http.StatusNotFound)
 	}
 
-	expectedContentTypeHeader := "application/json"
-	if contentTypeHeader := recorder.Header().Get("Content-Type"); contentTypeHeader != expectedContentTypeHeader {
-		t.Errorf("handler returned unexpected content-type header: got '%v' want '%v'",
-			recorder.Header().Get("Content-Type"), expectedContentTypeHeader)
-	}
-
 	t.Log(fmt.Sprintf("%#v", recorder))
+}
 
-	req, err = prepareRequest("GET", "http://localhost:9443/api/pets/1")
+func TestWrongSchemaInResponse(t *testing.T) {
+
+	v, err := createValidator(t)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// TODO: split tests
+	req, err := prepareRequest("GET", "http://localhost:9443/api/pets/1")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	recorder = httptest.NewRecorder()
+	mock := &mockWrongAPI{}
+
+	recorder := httptest.NewRecorder()
 
 	err = v.ServeHTTP(recorder, req, mock)
 	if err == nil {
@@ -203,16 +206,7 @@ func TestServeHTTP(t *testing.T) {
 			status, http.StatusInternalServerError)
 	}
 
-	expectedContentTypeHeader = "application/json"
-	if contentTypeHeader := recorder.Header().Get("Content-Type"); contentTypeHeader != expectedContentTypeHeader {
-		t.Errorf("handler returned unexpected content-type header: got '%v' want '%v'",
-			recorder.Header().Get("Content-Type"), expectedContentTypeHeader)
-	}
-
 	t.Log(fmt.Sprintf("%#v", recorder))
-
-	//t.Fail()
-	// TODO: more tests?
 }
 
 func TestEmptyResponse(t *testing.T) {
@@ -242,6 +236,38 @@ func TestEmptyResponse(t *testing.T) {
 	}
 
 	t.Log(fmt.Sprintf("%#v", recorder))
+}
 
-	//t.Fail()
+func TestServeHTTP(t *testing.T) {
+	v, err := createValidator(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mock := &mockAPI{}
+
+	req, err := prepareRequest("GET", "http://localhost:9443/api/pets/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+
+	err = v.ServeHTTP(recorder, req, mock)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if status := recorder.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+
+	expectedContentTypeHeader := "application/json"
+	if contentTypeHeader := recorder.Header().Get("Content-Type"); contentTypeHeader != expectedContentTypeHeader {
+		t.Errorf("handler returned unexpected content-type header: got '%v' want '%v'",
+			recorder.Header().Get("Content-Type"), expectedContentTypeHeader)
+	}
+
+	t.Log(fmt.Sprintf("%#v", recorder))
 }
