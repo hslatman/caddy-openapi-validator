@@ -57,7 +57,7 @@ func prepareRequest(method, url string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	//req.Header.Set("Host", "https://localhost:9443")
+
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Accept-Language", "*")
 	req.Header.Set("User-Agent", "caddy-openapi-validator-test")
@@ -65,30 +65,64 @@ func prepareRequest(method, url string) (*http.Request, error) {
 	return req, nil
 }
 
+type mockWrongAPI struct {
+}
+
 type mockAPI struct {
 }
 
-type pet struct {
-	ID int `json:"id"`
-	//Name string `json:"name"`
+type notFoundAPI struct {
+}
+
+type wrongPet struct {
+	ID  int    `json:"id"`
 	Tag string `json:"tag,omitempty"`
-	//Additional string `json:"additional"`
+}
+
+type pet struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	Tag  string `json:"tag,omitempty"`
+}
+
+// ServeHTTP serves a mock Pet Store API for testing purposes
+func (m *mockWrongAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
+
+	w.Header().Set("Content-Type", "application/json")
+
+	pet1 := wrongPet{
+		ID: 1,
+	}
+
+	json.NewEncoder(w).Encode(pet1)
+
+	w.WriteHeader(200)
+
+	return nil
 }
 
 // ServeHTTP serves a mock Pet Store API for testing purposes
 func (m *mockAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 
-	// TODO: provide a bit more realistic data that actually conforms to the OpenAPI specification?
 	w.Header().Set("Content-Type", "application/json")
 
 	pet1 := pet{
-		ID: 1,
-		//Name: "Pet 1",
-		//Additional: "this should trigger an error",
+		ID:   1,
+		Name: "Pet 1",
 	}
 	json.NewEncoder(w).Encode(pet1)
 
 	w.WriteHeader(200)
+
+	return nil
+}
+
+// ServeHTTP serves a 404 API
+func (m *notFoundAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
+
+	w.Header().Set("Content-Type", "application/json")
+
+	w.WriteHeader(404)
 
 	return nil
 }
@@ -130,7 +164,7 @@ func TestServeHTTP(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 
-	mock := &mockAPI{}
+	mock := &mockWrongAPI{}
 
 	err = v.ServeHTTP(recorder, req, mock)
 	if err == nil { // TODO: add tests with non-enforcement (i.e. no error expected)
@@ -179,4 +213,35 @@ func TestServeHTTP(t *testing.T) {
 
 	//t.Fail()
 	// TODO: more tests?
+}
+
+func TestEmptyResponse(t *testing.T) {
+
+	v, err := createValidator(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mock := &notFoundAPI{}
+
+	req, err := prepareRequest("GET", "http://localhost:9443/api/pets/2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+
+	err = v.ServeHTTP(recorder, req, mock)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if status := recorder.Code; status != http.StatusNotFound {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusNotFound)
+	}
+
+	t.Log(fmt.Sprintf("%#v", recorder))
+
+	//t.Fail()
 }

@@ -177,6 +177,8 @@ func (v *Validator) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		return err
 	}
 
+	// TODO: handle the case that the response is empty (i.e. 404, 204, etc)?
+
 	if !recorder.Buffered() {
 		// TODO: do we need to do something with this?
 		//return nil

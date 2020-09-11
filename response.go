@@ -30,12 +30,15 @@ func (v *Validator) validateResponse(rr caddyhttp.ResponseRecorder, request *htt
 		RequestValidationInput: requestValidationInput,
 		Status:                 rr.Status(),
 		Header:                 rr.Header(),
+		Options:                &v.options.Options,
 	}
 
-	responseValidationInput.SetBodyBytes(rr.Buffer().Bytes())
+	body := rr.Buffer().Bytes()
+	responseValidationInput.SetBodyBytes(body)
 
-	if v.options != nil {
-		responseValidationInput.Options = &v.options.Options
+	if len(body) == 0 {
+		// In case the response body is empty, we exclude it from being validated
+		responseValidationInput.Options.ExcludeResponseBody = true
 	}
 
 	v.logger.Debug(fmt.Sprintf("%#v", responseValidationInput))
