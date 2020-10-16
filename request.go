@@ -44,7 +44,7 @@ func (v *Validator) validateRequest(rw http.ResponseWriter, r *http.Request, val
 			}
 		case *openapi3filter.SecurityRequirementsError:
 			return &oapiError{
-				Code:     http.StatusForbidden,
+				Code:     http.StatusForbidden, // TOOD: is this the right code? The validator is not the authorizing party.
 				Message:  e.Error(),
 				Internal: err,
 			}

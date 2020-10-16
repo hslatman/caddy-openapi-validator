@@ -36,6 +36,7 @@ func createValidator(t *testing.T) (*Validator, error) {
 		ValidateRequests:  &boolValue,
 		ValidateResponses: &boolValue,
 		ValidateServers:   &boolValue,
+		ValidateSecurity:  &boolValue,
 		Enforce:           &boolValue,
 		Log:               &boolValue,
 	}
@@ -58,6 +59,7 @@ func replaceValidator(v *Validator) (*Validator, error) {
 		ValidateRequests:  v.ValidateRequests,
 		ValidateResponses: v.ValidateResponses,
 		ValidateServers:   v.ValidateServers,
+		ValidateSecurity:  v.ValidateSecurity,
 		Enforce:           v.Enforce,
 		Log:               v.Log,
 		logger:            v.logger,
@@ -202,12 +204,77 @@ func TestServerValidation(t *testing.T) {
 	}
 
 	if n.shouldValidateServers() {
-		t.Error("validation should be off")
+		t.Error("server validation should be off")
 	}
 
 	// NOTE: in case we disable server validation, the base URL no longer has /api prefixed; that's
 	// why the request below does not have /api.
 	req, err = prepareRequest("GET", "http://some-unknown-host:9443/pets/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder = httptest.NewRecorder()
+
+	err = n.ServeHTTP(recorder, req, mock)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestSecurityValidation(t *testing.T) {
+	v, err := createValidator(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Override the default petstore.yaml with the secured one
+	v.Filepath = "examples/petstore-secured.yaml"
+	v, err = replaceValidator(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !(v.Filepath == "examples/petstore-secured.yaml") {
+		t.Error("wrong filepath set for security validation test")
+	}
+
+	if !v.shouldValidateSecurity() {
+		t.Error("security validation should be on")
+	}
+
+	mock := &mockAPI{}
+
+	// TODO: the security check validation does not seem to work as expected yet.
+	req, err := prepareRequest("GET", "http://localhost:9443/api/pets/1")
+	if err != nil {
+		t.Error(err)
+	}
+
+	//req.Header.Set("Authorization", "Basic QWxhZGRpbjpPcGVuU2VzYW1l")
+
+	recorder := httptest.NewRecorder()
+
+	err = v.ServeHTTP(recorder, req, mock)
+	if err == nil {
+		t.Error("expected an error while enforcing security validation")
+	}
+
+	bValue := false
+	v.ValidateSecurity = &bValue
+
+	n, err := replaceValidator(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if n.shouldValidateSecurity() {
+		t.Error("security validation should be off")
+	}
+
+	// NOTE: in case we disable server validation, the base URL no longer has /api prefixed; that's
+	// why the request below does not have /api.
+	req, err = prepareRequest("GET", "http://localhost:9443/api/pets/1")
 	if err != nil {
 		t.Fatal(err)
 	}

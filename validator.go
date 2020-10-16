@@ -64,6 +64,9 @@ type Validator struct {
 	// Indicates whether request validation should be enabled
 	// Default is true
 	ValidateServers *bool `json:"validate_servers,omitempty"`
+	// Indicates whether request validation should be enabled
+	// Default is true
+	ValidateSecurity *bool `json:"validate_security,omitempty"`
 	// Indicates whether the OpenAPI specification should be enforced, meaning that invalid
 	// requests and responses will be filtered and an (appropriate) status is returned
 	// Default is true
@@ -71,8 +74,6 @@ type Validator struct {
 	// To log or not to log
 	// Default is true
 	Log *bool `json:"log,omitempty"`
-
-	// TODO: some option to add/override server / disable the server check
 }
 
 // CaddyModule returns the Caddy module information.
@@ -229,7 +230,11 @@ func (v *Validator) prepareOpenAPISpecification() error {
 		specification.Servers = nil
 	}
 
-	//specification.Security = nil // TODO: make it possible to configure this
+	if !v.shouldValidateSecurity() {
+		specification.Security = nil
+	}
+
+	// TODO: disable server and security validation on non-top-level; i.e. specific routes?
 
 	v.specification = specification
 
@@ -252,6 +257,10 @@ func (v *Validator) prepareOpenAPISpecification() error {
 
 func (v *Validator) shouldValidateServers() bool {
 	return v.ValidateServers == nil || *v.ValidateServers
+}
+
+func (v *Validator) shouldValidateSecurity() bool {
+	return v.ValidateSecurity == nil || *v.ValidateSecurity
 }
 
 func (v *Validator) shouldEnforce() bool {

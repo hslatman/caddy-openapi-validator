@@ -43,6 +43,8 @@ Configure the OpenAPI Validator handler as one of the handlers to be executed by
                 "validate_routes": true,
                 "validate_requests": true,
                 "validate_responses": true,
+                "validate_servers": true,
+                "validate_security": true,
                 "enforce": true,
                 "log": true
             }
