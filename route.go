@@ -33,6 +33,8 @@ func (v *Validator) validateRoute(r *http.Request) (*openapi3filter.RequestValid
 		url.Scheme = "https"
 	}
 
+	// TODO: option to cut off a prefix after host? I.e. /api, if that's part of the base url?
+
 	method := r.Method
 	route, pathParams, err := v.router.FindRoute(method, url)
 
