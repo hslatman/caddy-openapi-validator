@@ -67,6 +67,12 @@ type Validator struct {
 	// Indicates whether request validation should be enabled
 	// Default is true
 	ValidateSecurity *bool `json:"validate_security,omitempty"`
+	// URL path prefix that trimmed from the URL path
+	// It can be of use when server validation is turned off
+	// and the paths in an OpenAPI spec do not match the
+	// implementation directly.
+	// Default is empty string
+	PathPrefixToBeTrimmed string `json:"path_prefix_to_be_trimmed,omitempty"`
 	// Indicates whether the OpenAPI specification should be enforced, meaning that invalid
 	// requests and responses will be filtered and an (appropriate) status is returned
 	// Default is true

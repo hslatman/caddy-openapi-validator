@@ -17,6 +17,7 @@ package openapi
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3filter"
 )
@@ -26,14 +27,13 @@ func (v *Validator) validateRoute(r *http.Request) (*openapi3filter.RequestValid
 
 	// Reconstruct the url from the request; makes it work for localhost
 	url := r.URL
+	url.Path = strings.TrimPrefix(url.Path, v.PathPrefixToBeTrimmed)
 	url.Host = r.Host // TODO: verify this is an OK thing to do (i.e. what about proxies? Other protocols?)
 	if r.TLS == nil {
 		url.Scheme = "http"
 	} else {
 		url.Scheme = "https"
 	}
-
-	// TODO: option to cut off a prefix after host? I.e. /api, if that's part of the base url?
 
 	method := r.Method
 	route, pathParams, err := v.router.FindRoute(method, url)
@@ -44,9 +44,34 @@ func (v *Validator) validateRoute(r *http.Request) (*openapi3filter.RequestValid
 		case *openapi3filter.RouteError:
 			// The requested path doesn't match the server, path or anything else.
 			// TODO: switch between cases based on the e.Reason string? Some are not found, some are invalid method, etc.
-			return nil, &oapiError{
-				Code:    http.StatusNotFound, //http.StatusBadRequest,
-				Message: e.Reason,
+			switch reason := e.Reason; reason {
+			case "Does not match any server":
+				if v.shouldValidateServers() {
+					return nil, &oapiError{
+						Code:    http.StatusNotFound, //http.StatusBadRequest?
+						Message: reason,
+					}
+				}
+			case "Path was not found":
+				return nil, &oapiError{
+					Code:    http.StatusNotFound, //http.StatusBadRequest?
+					Message: reason,
+				}
+			case "Path doesn't support the HTTP method":
+				return nil, &oapiError{
+					Code:    http.StatusMethodNotAllowed, //http.StatusBadRequest?
+					Message: reason,
+				}
+			case "None of the routers matches":
+				return nil, &oapiError{
+					Code:    http.StatusMethodNotAllowed, //http.StatusBadRequest?
+					Message: reason,
+				}
+			default:
+				return nil, &oapiError{
+					Code:    http.StatusNotFound, //http.StatusBadRequest?
+					Message: reason,
+				}
 			}
 		default:
 			// Fallback for unexpected or unimplemented cases

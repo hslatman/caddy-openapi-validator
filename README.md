@@ -45,6 +45,7 @@ Configure the OpenAPI Validator handler as one of the handlers to be executed by
                 "validate_responses": true,
                 "validate_servers": true,
                 "validate_security": true,
+                "path_prefix_to_be_trimmed": "",
                 "enforce": true,
                 "log": true
             }

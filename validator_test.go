@@ -31,14 +31,15 @@ func createValidator(t *testing.T) (*Validator, error) {
 
 	boolValue := true
 	validator := &Validator{
-		Filepath:          "examples/petstore.yaml",
-		ValidateRoutes:    &boolValue,
-		ValidateRequests:  &boolValue,
-		ValidateResponses: &boolValue,
-		ValidateServers:   &boolValue,
-		ValidateSecurity:  &boolValue,
-		Enforce:           &boolValue,
-		Log:               &boolValue,
+		Filepath:              "examples/petstore.yaml",
+		ValidateRoutes:        &boolValue,
+		ValidateRequests:      &boolValue,
+		ValidateResponses:     &boolValue,
+		ValidateServers:       &boolValue,
+		ValidateSecurity:      &boolValue,
+		PathPrefixToBeTrimmed: "",
+		Enforce:               &boolValue,
+		Log:                   &boolValue,
 	}
 
 	// NOTE: we're performing the Provision() steps manually here, because there's a lot going on under the hood of Caddy
@@ -54,16 +55,17 @@ func createValidator(t *testing.T) (*Validator, error) {
 
 func replaceValidator(v *Validator) (*Validator, error) {
 	new := &Validator{
-		Filepath:          v.Filepath,
-		ValidateRoutes:    v.ValidateRoutes,
-		ValidateRequests:  v.ValidateRequests,
-		ValidateResponses: v.ValidateResponses,
-		ValidateServers:   v.ValidateServers,
-		ValidateSecurity:  v.ValidateSecurity,
-		Enforce:           v.Enforce,
-		Log:               v.Log,
-		logger:            v.logger,
-		bufferPool:        v.bufferPool,
+		Filepath:              v.Filepath,
+		ValidateRoutes:        v.ValidateRoutes,
+		ValidateRequests:      v.ValidateRequests,
+		ValidateResponses:     v.ValidateResponses,
+		ValidateServers:       v.ValidateServers,
+		ValidateSecurity:      v.ValidateSecurity,
+		PathPrefixToBeTrimmed: v.PathPrefixToBeTrimmed,
+		Enforce:               v.Enforce,
+		Log:                   v.Log,
+		logger:                v.logger,
+		bufferPool:            v.bufferPool,
 	}
 
 	err := new.prepareOpenAPISpecification()
@@ -195,8 +197,11 @@ func TestServerValidation(t *testing.T) {
 		t.Error("expected an error while enforcing server validation")
 	}
 
+	// Disable server validation and set /api as URL path prefix to be trimmed
+	// so that we can keep the same URL in the request
 	bValue := false
 	v.ValidateServers = &bValue
+	v.PathPrefixToBeTrimmed = "/api"
 
 	n, err := replaceValidator(v)
 	if err != nil {
@@ -207,9 +212,7 @@ func TestServerValidation(t *testing.T) {
 		t.Error("server validation should be off")
 	}
 
-	// NOTE: in case we disable server validation, the base URL no longer has /api prefixed; that's
-	// why the request below does not have /api.
-	req, err = prepareRequest("GET", "http://some-unknown-host:9443/pets/1")
+	req, err = prepareRequest("GET", "http://some-unknown-host:9443/api/pets/1")
 	if err != nil {
 		t.Fatal(err)
 	}
