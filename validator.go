@@ -61,6 +61,9 @@ type Validator struct {
 	// Indicates whether request validation should be enabled
 	// Default is true
 	ValidateResponses *bool `json:"validate_responses,omitempty"`
+	// Indicates whether request validation should be enabled
+	// Default is true
+	ValidateServers *bool `json:"validate_servers,omitempty"`
 	// Indicates whether the OpenAPI specification should be enforced, meaning that invalid
 	// requests and responses will be filtered and an (appropriate) status is returned
 	// Default is true
@@ -221,8 +224,13 @@ func (v *Validator) prepareOpenAPISpecification() error {
 	if err != nil {
 		return err
 	}
-	//specification.Servers = nil  // TODO: make it possible to configure this
+
+	if !v.shouldValidateServers() {
+		specification.Servers = nil
+	}
+
 	//specification.Security = nil // TODO: make it possible to configure this
+
 	v.specification = specification
 
 	// TODO: validate the specification is a valid spec? Is actually performed via WithSwagger, but can break the program, so we might need to to this in Validate()
@@ -240,6 +248,10 @@ func (v *Validator) prepareOpenAPISpecification() error {
 	}
 
 	return nil
+}
+
+func (v *Validator) shouldValidateServers() bool {
+	return v.ValidateServers == nil || *v.ValidateServers
 }
 
 func (v *Validator) shouldEnforce() bool {

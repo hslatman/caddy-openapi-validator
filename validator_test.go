@@ -35,6 +35,7 @@ func createValidator(t *testing.T) (*Validator, error) {
 		ValidateRoutes:    &boolValue,
 		ValidateRequests:  &boolValue,
 		ValidateResponses: &boolValue,
+		ValidateServers:   &boolValue,
 		Enforce:           &boolValue,
 		Log:               &boolValue,
 	}
@@ -48,6 +49,27 @@ func createValidator(t *testing.T) (*Validator, error) {
 	}
 
 	return validator, nil
+}
+
+func replaceValidator(v *Validator) (*Validator, error) {
+	new := &Validator{
+		Filepath:          v.Filepath,
+		ValidateRoutes:    v.ValidateRoutes,
+		ValidateRequests:  v.ValidateRequests,
+		ValidateResponses: v.ValidateResponses,
+		ValidateServers:   v.ValidateServers,
+		Enforce:           v.Enforce,
+		Log:               v.Log,
+		logger:            v.logger,
+		bufferPool:        v.bufferPool,
+	}
+
+	err := new.prepareOpenAPISpecification()
+	if err != nil {
+		return nil, err
+	}
+
+	return new, nil
 }
 
 func prepareRequest(method, url string) (*http.Request, error) {
@@ -146,6 +168,53 @@ func TestValidate(t *testing.T) {
 	bValue = true
 	v.ValidateRoutes = &bValue
 	err = v.Validate()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestServerValidation(t *testing.T) {
+	v, err := createValidator(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mock := &mockAPI{}
+
+	req, err := prepareRequest("GET", "http://some-unknown-host:9443/api/pets/1")
+	if err != nil {
+		t.Error(err)
+	}
+
+	recorder := httptest.NewRecorder()
+
+	err = v.ServeHTTP(recorder, req, mock)
+	if err == nil {
+		t.Error("expected an error while enforcing server validation")
+	}
+
+	bValue := false
+	v.ValidateServers = &bValue
+
+	n, err := replaceValidator(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if n.shouldValidateServers() {
+		t.Error("validation should be off")
+	}
+
+	// NOTE: in case we disable server validation, the base URL no longer has /api prefixed; that's
+	// why the request below does not have /api.
+	req, err = prepareRequest("GET", "http://some-unknown-host:9443/pets/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder = httptest.NewRecorder()
+
+	err = n.ServeHTTP(recorder, req, mock)
 	if err != nil {
 		t.Error(err)
 	}
