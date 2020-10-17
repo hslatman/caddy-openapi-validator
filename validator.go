@@ -45,12 +45,6 @@ const (
 
 // Validator is used to validate OpenAPI requests and responses against an OpenAPI specification
 type Validator struct {
-	specification *openapi3.Swagger
-	options       *validatorOptions
-	router        *openapi3filter.Router
-	logger        *zap.Logger
-	bufferPool    *bpool.BufferPool
-
 	// The filepath to the OpenAPI (v3) specification to use
 	Filepath string `json:"filepath,omitempty"`
 	// Indicates whether routes should be validated
@@ -69,11 +63,12 @@ type Validator struct {
 	// Indicates whether request validation should be enabled
 	// Default is true
 	ValidateSecurity *bool `json:"validate_security,omitempty"`
-	// URL path prefix that trimmed from the URL path
+	// URL path prefix that is trimmed from the URL path.
 	// It can be of use when server validation is turned off
 	// and the paths in an OpenAPI spec do not match the
-	// implementation directly.
-	// Default is empty string
+	// implementation directly, i.e. are missing an /api prefix,
+	// for example.
+	// Default is empty string, resulting in no prefix trimming.
 	PathPrefixToBeTrimmed string `json:"path_prefix_to_be_trimmed,omitempty"`
 	// Indicates whether the OpenAPI specification should be enforced, meaning that invalid
 	// requests and responses will be filtered and an (appropriate) status is returned
@@ -82,6 +77,12 @@ type Validator struct {
 	// To log or not to log
 	// Default is true
 	Log *bool `json:"log,omitempty"`
+
+	specification *openapi3.Swagger
+	options       *validatorOptions
+	router        *openapi3filter.Router
+	logger        *zap.Logger
+	bufferPool    *bpool.BufferPool
 }
 
 // CaddyModule returns the Caddy module information.
@@ -288,21 +289,11 @@ func (v *Validator) logError(err error) {
 // security requirement error will be thrown.
 func (v *Validator) createAuthenticationFunc() func(c context.Context, input *openapi3filter.AuthenticationInput) error {
 
-	// The function needs to check whether the requests had the correct way of authentication
-	// It probably has to be similar to become similar to the one here in PHP:
-	// https://github.com/thephpleague/openapi-psr7-validator/blob/master/src/PSR7/Validators/SecurityValidator.php
-
 	if !v.shouldValidateSecurity() {
 		return openapi3filter.NoopAuthenticationFunc
 	}
 
 	return func(c context.Context, input *openapi3filter.AuthenticationInput) error {
-
-		fmt.Println(input)
-		fmt.Println(input.RequestValidationInput)
-		fmt.Println(input.Scopes)
-		fmt.Println(input.SecurityScheme)
-		fmt.Println(input.SecuritySchemeName)
 
 		// TODO: Can we perform validation of multiple security methods here, like multiple API keys?
 		// That wil only work if the openapi3filter library does it correctly right now. Otherwise
@@ -357,54 +348,19 @@ func (v *Validator) createAuthenticationFunc() func(c context.Context, input *op
 			default:
 				return fmt.Errorf("invalid property %s for carrying an apiKey", scheme.In)
 			}
-
 		case "oauth2":
-			// TODO: implement this check
-			return fmt.Errorf("oauth2 security scheme check for %q not implemented yet", input.SecuritySchemeName)
+			// TODO: is this checkable? If so, we should implement the check.
+			//return fmt.Errorf("oauth2 security scheme check for %q not implemented yet", input.SecuritySchemeName)
+			v.logger.Debug(fmt.Sprintf("oauth2 security scheme check for %q not implemented (yet)", input.SecuritySchemeName))
+			return nil
 		case "openIdConnect":
-			// TODO: implement this check
-			return fmt.Errorf("openidconnect security scheme check for %q not implemented yet", input.SecuritySchemeName)
+			// TODO: is this checkable? If so, we should implement the check.
+			//return fmt.Errorf("openidconnect security scheme check for %q not implemented yet", input.SecuritySchemeName)
+			v.logger.Debug(fmt.Sprintf("openidconnect security scheme check for %q not implemented )(yet)", input.SecuritySchemeName))
+			return nil
 		default:
 			return fmt.Errorf("security scheme: %s for %q is unknown", scheme.Type, input.SecuritySchemeName)
 		}
-
-		// type SecurityScheme struct {
-		// 	ExtensionProps
-
-		// 	Type         string      `json:"type,omitempty" yaml:"type,omitempty"`
-		// 	Description  string      `json:"description,omitempty" yaml:"description,omitempty"`
-		// 	Name         string      `json:"name,omitempty" yaml:"name,omitempty"`
-		// 	In           string      `json:"in,omitempty" yaml:"in,omitempty"`
-		// 	Scheme       string      `json:"scheme,omitempty" yaml:"scheme,omitempty"`
-		// 	BearerFormat string      `json:"bearerFormat,omitempty" yaml:"bearerFormat,omitempty"`
-		// 	Flows        *OAuthFlows `json:"flows,omitempty" yaml:"flows,omitempty"`
-		// }
-
-		// 	Request      *http.Request
-		// PathParams   map[string]string
-		// QueryParams  url.Values
-		// Route        *Route
-		// Options      *Options
-		// ParamDecoder ContentParameterDecoder
-
-		// TODO: get the request validation input (i.e. headers, cookies, etc)
-		// and transform it into something like the map of schemes or something more elaborate
-
-		// // If the scheme is valid and present in the schemes
-		// valid, present := schemes[input.SecuritySchemeName]
-		// if valid && present {
-		// 	return nil
-		// }
-
-		// // If the scheme is present in the schemes
-		// if present {
-		// 	// Return an unmet scheme error
-		// 	return fmt.Errorf("security scheme for %q wasn't met", input.SecuritySchemeName)
-		// }
-		// // Return an unknown scheme error
-		// return fmt.Errorf("security scheme for %q is unknown", input.SecuritySchemeName)
-
-		return fmt.Errorf("security scheme for %q could not be checked", input.SecuritySchemeName)
 	}
 }
 

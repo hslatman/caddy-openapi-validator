@@ -290,8 +290,6 @@ func TestSecurityValidation(t *testing.T) {
 		t.Error("security validation should be off")
 	}
 
-	// NOTE: in case we disable server validation, the base URL no longer has /api prefixed; that's
-	// why the request below does not have /api.
 	req, err = prepareRequest("GET", "http://localhost:9443/api/pets/1")
 	if err != nil {
 		t.Fatal(err)
