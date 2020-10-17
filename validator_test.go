@@ -238,6 +238,7 @@ func TestSecurityValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Use a secured version of the PetStore API; HTTP Basic Authentication is enabled
 	if !(v.Filepath == "examples/petstore-secured.yaml") {
 		t.Error("wrong filepath set for security validation test")
 	}
@@ -248,13 +249,11 @@ func TestSecurityValidation(t *testing.T) {
 
 	mock := &mockAPI{}
 
-	// TODO: the security check validation does not seem to work as expected yet.
+	// This request does not have an HTTP Basic Authentication (Authorization) header and should fail
 	req, err := prepareRequest("GET", "http://localhost:9443/api/pets/1")
 	if err != nil {
 		t.Error(err)
 	}
-
-	//req.Header.Set("Authorization", "Basic QWxhZGRpbjpPcGVuU2VzYW1l")
 
 	recorder := httptest.NewRecorder()
 
@@ -263,6 +262,22 @@ func TestSecurityValidation(t *testing.T) {
 		t.Error("expected an error while enforcing security validation")
 	}
 
+	// Prepare the same request, but this time we're adding HTTP Basic Authentication
+	req, err = prepareRequest("GET", "http://localhost:9443/api/pets/1")
+	if err != nil {
+		t.Error(err)
+	}
+
+	req.Header.Set("Authorization", "Basic Y2FkZHk6b3BlbmFwaQ==")
+
+	recorder = httptest.NewRecorder()
+
+	err = v.ServeHTTP(recorder, req, mock)
+	if err != nil {
+		t.Error("expected an error while enforcing security validation")
+	}
+
+	// We turn security validation off; now requests can be executed without security set
 	bValue := false
 	v.ValidateSecurity = &bValue
 

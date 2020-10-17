@@ -15,8 +15,10 @@
 package openapi
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/oxtoacart/bpool"
 
@@ -253,7 +255,7 @@ func (v *Validator) prepareOpenAPISpecification() error {
 			ExcludeRequestBody:    false,
 			ExcludeResponseBody:   false,
 			IncludeResponseStatus: true,
-			AuthenticationFunc:    NoopAuthenticationFunc, // TODO: can we provide an actual one? Should we? And how?
+			AuthenticationFunc:    v.createAuthenticationFunc(),
 		},
 		//ParamDecoder: ,
 	}
@@ -277,6 +279,132 @@ func (v *Validator) logError(err error) {
 	if v.Log == nil || *v.Log {
 		v.logger.Error(err.Error())
 		v.logger.Sync()
+	}
+}
+
+// createAuthenticationFunc creates an authentication function based on configuration of the
+// Validator. If an invalid or unknown scheme is encountered, an error is returned by the
+// returned function. Otherwise the return value of the returned function is nil and no
+// security requirement error will be thrown.
+func (v *Validator) createAuthenticationFunc() func(c context.Context, input *openapi3filter.AuthenticationInput) error {
+
+	// The function needs to check whether the requests had the correct way of authentication
+	// It probably has to be similar to become similar to the one here in PHP:
+	// https://github.com/thephpleague/openapi-psr7-validator/blob/master/src/PSR7/Validators/SecurityValidator.php
+
+	if !v.shouldValidateSecurity() {
+		return openapi3filter.NoopAuthenticationFunc
+	}
+
+	return func(c context.Context, input *openapi3filter.AuthenticationInput) error {
+
+		fmt.Println(input)
+		fmt.Println(input.RequestValidationInput)
+		fmt.Println(input.Scopes)
+		fmt.Println(input.SecurityScheme)
+		fmt.Println(input.SecuritySchemeName)
+
+		// TODO: Can we perform validation of multiple security methods here, like multiple API keys?
+		// That wil only work if the openapi3filter library does it correctly right now. Otherwise
+		// that will need to be patched or we need a workaround for it.
+		// TODO: should we check scopes too?
+
+		scheme := input.SecurityScheme
+		request := input.RequestValidationInput.Request
+
+		switch scheme.Type {
+		case "http":
+			switch scheme.Scheme {
+			case "basic":
+				if _, _, ok := request.BasicAuth(); !ok {
+					return fmt.Errorf("no HTTP basic authentication credentials provided")
+				}
+				return nil
+			case "bearer":
+				header := request.Header.Get("Authorization")
+				if !strings.HasPrefix(header, "Bearer ") {
+					return fmt.Errorf("no HTTP bearer authentication provided")
+				}
+				return nil
+			default:
+				// TODO: should we add a case for other HTTP schemes as defined by RFC 7235 and HTTP Authentication Scheme Registry?
+				// These should then probably be in the Authorization header too?
+				return fmt.Errorf("invalid http scheme %s for credentials", scheme.Scheme)
+			}
+		case "apiKey":
+			name := scheme.Name
+			switch scheme.In {
+			case "query":
+				key := request.URL.Query().Get(name)
+				if key == "" {
+					return fmt.Errorf("failed to retrieve API key from query parameter %s", name)
+				}
+				return nil
+			case "header":
+				canonicalName := http.CanonicalHeaderKey(name)
+				header := request.Header.Get(canonicalName)
+				if header == "" {
+					return fmt.Errorf("failed to retrieve API key from header %s (canonicalized to: %s)", name, canonicalName)
+				}
+				return nil
+			case "cookie":
+				// TODO: do we also need to check CSRF tokens?
+				_, err := request.Cookie(name)
+				if err != nil {
+					return fmt.Errorf("failed to retrieve cookie (%s): %s", name, err.Error())
+				}
+				return nil
+			default:
+				return fmt.Errorf("invalid property %s for carrying an apiKey", scheme.In)
+			}
+
+		case "oauth2":
+			// TODO: implement this check
+			return fmt.Errorf("oauth2 security scheme check for %q not implemented yet", input.SecuritySchemeName)
+		case "openIdConnect":
+			// TODO: implement this check
+			return fmt.Errorf("openidconnect security scheme check for %q not implemented yet", input.SecuritySchemeName)
+		default:
+			return fmt.Errorf("security scheme: %s for %q is unknown", scheme.Type, input.SecuritySchemeName)
+		}
+
+		// type SecurityScheme struct {
+		// 	ExtensionProps
+
+		// 	Type         string      `json:"type,omitempty" yaml:"type,omitempty"`
+		// 	Description  string      `json:"description,omitempty" yaml:"description,omitempty"`
+		// 	Name         string      `json:"name,omitempty" yaml:"name,omitempty"`
+		// 	In           string      `json:"in,omitempty" yaml:"in,omitempty"`
+		// 	Scheme       string      `json:"scheme,omitempty" yaml:"scheme,omitempty"`
+		// 	BearerFormat string      `json:"bearerFormat,omitempty" yaml:"bearerFormat,omitempty"`
+		// 	Flows        *OAuthFlows `json:"flows,omitempty" yaml:"flows,omitempty"`
+		// }
+
+		// 	Request      *http.Request
+		// PathParams   map[string]string
+		// QueryParams  url.Values
+		// Route        *Route
+		// Options      *Options
+		// ParamDecoder ContentParameterDecoder
+
+		// TODO: get the request validation input (i.e. headers, cookies, etc)
+		// and transform it into something like the map of schemes or something more elaborate
+
+		// // If the scheme is valid and present in the schemes
+		// valid, present := schemes[input.SecuritySchemeName]
+		// if valid && present {
+		// 	return nil
+		// }
+
+		// // If the scheme is present in the schemes
+		// if present {
+		// 	// Return an unmet scheme error
+		// 	return fmt.Errorf("security scheme for %q wasn't met", input.SecuritySchemeName)
+		// }
+		// // Return an unknown scheme error
+		// return fmt.Errorf("security scheme for %q is unknown", input.SecuritySchemeName)
+
+		return fmt.Errorf("security scheme for %q could not be checked", input.SecuritySchemeName)
 	}
 }
 

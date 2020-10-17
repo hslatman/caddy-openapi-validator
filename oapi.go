@@ -15,19 +15,16 @@
 package openapi
 
 import (
-	"context"
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 )
 
 // TODO: add some other functionality for wrapping kin-openapi / swagger functionality, like validation
-
-// NoopAuthenticationFunc is an AuthenticationFunc used for mocking/disabling auth checks
-func NoopAuthenticationFunc(context.Context, *openapi3filter.AuthenticationInput) error { return nil }
 
 // readOpenAPISpecification returns the OpenAPI specification corresponding
 func readOpenAPISpecification(path string) (*openapi3.Swagger, error) {
@@ -56,4 +53,18 @@ func readOpenAPISpecification(path string) (*openapi3.Swagger, error) {
 	}
 
 	return openapi, nil
+}
+
+func formatFullError(err *openapi3filter.SecurityRequirementsError) error {
+
+	if len(err.Errors) == 0 {
+		return err
+	}
+
+	r := "Compound error: (0) " + err.Errors[0].Error()
+	for i := 1; i < len(err.Errors); i++ {
+		r = strings.Join([]string{r, fmt.Sprintf("(%d) %s", i, err.Errors[i].Error())}, ", ")
+	}
+
+	return fmt.Errorf(r)
 }

@@ -43,10 +43,12 @@ func (v *Validator) validateRequest(rw http.ResponseWriter, r *http.Request, val
 				Internal: err,
 			}
 		case *openapi3filter.SecurityRequirementsError:
-			return &oapiError{
-				Code:     http.StatusForbidden, // TOOD: is this the right code? The validator is not the authorizing party.
-				Message:  e.Error(),
-				Internal: err,
+			if v.shouldValidateSecurity() {
+				return &oapiError{
+					Code:     http.StatusForbidden, // TOOD: is this the right code? The validator is not the authorizing party.
+					Message:  formatFullError(e),
+					Internal: err,
+				}
 			}
 		default:
 			// Fallback for unexpected or unimplemented cases
