@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -62,8 +63,10 @@ func addAdditionalServers(o *openapi3.Swagger, servers []string) *openapi3.Swagg
 	}
 
 	for i, s := range servers {
-		// TODO: add check that server format is actually OK for OpenAPI?
 		if s == "" {
+			continue
+		}
+		if !isValidOpenAPIUrl(s) {
 			continue
 		}
 		server := &openapi3.Server{
@@ -75,6 +78,16 @@ func addAdditionalServers(o *openapi3.Swagger, servers []string) *openapi3.Swagg
 	}
 
 	return o
+}
+
+func isValidOpenAPIUrl(str string) bool {
+	// Replace URLs prefixed with ws and wss into https://, such that ParseRequestURI works
+	if strings.HasPrefix(str, "ws://") || strings.HasPrefix(str, "wss://") {
+		re := regexp.MustCompile(`^wss?://`)
+		str = string(re.ReplaceAll([]byte(str), []byte("https://")))
+	}
+	_, err := url.ParseRequestURI(str)
+	return err == nil
 }
 
 func formatFullError(err *openapi3filter.SecurityRequirementsError) error {

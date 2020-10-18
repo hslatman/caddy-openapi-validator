@@ -18,7 +18,7 @@ The request/response flow is as follows:
 
 ## Usage
 
-The simplest way to use the OpenAPI Validator HTTP handler is by using `xcaddy`:
+The simplest way to use the OpenAPI Validator HTTP handler is by using [xcaddy](https://github.com/caddyserver/xcaddy):
 
 ```bash
 $ xcaddy build v2.1.1 --with github.com/hslatman/caddy-openapi-validator
