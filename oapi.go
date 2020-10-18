@@ -55,6 +55,24 @@ func readOpenAPISpecification(path string) (*openapi3.Swagger, error) {
 	return openapi, nil
 }
 
+func addAdditionalServers(o *openapi3.Swagger, servers []string) *openapi3.Swagger {
+
+	if servers == nil {
+		return o
+	}
+
+	for i, s := range servers {
+		server := &openapi3.Server{
+			URL:         s,
+			Description: fmt.Sprintf("Additional server: %d", i),
+			Variables:   make(map[string]*openapi3.ServerVariable),
+		}
+		o.Servers = append(o.Servers, server)
+	}
+
+	return o
+}
+
 func formatFullError(err *openapi3filter.SecurityRequirementsError) error {
 
 	if len(err.Errors) == 0 {

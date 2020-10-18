@@ -70,6 +70,10 @@ type Validator struct {
 	// for example.
 	// Default is empty string, resulting in no prefix trimming.
 	PathPrefixToBeTrimmed string `json:"path_prefix_to_be_trimmed,omitempty"`
+	// A list of additional servers to be considered valid when
+	// when performing the request validation. The additional servers
+	// are added to the servers in the OpenAPI specification.
+	AdditionalServers []string `json:"additional_servers,omitempty"`
 	// Indicates whether the OpenAPI specification should be enforced, meaning that invalid
 	// requests and responses will be filtered and an (appropriate) status is returned
 	// Default is true
@@ -235,7 +239,10 @@ func (v *Validator) prepareOpenAPISpecification() error {
 		return err
 	}
 
+	specification = addAdditionalServers(specification, v.AdditionalServers)
+
 	if !v.shouldValidateServers() {
+		// TODO: server validation is turned off, should we fallback to relative path (/) ?
 		specification.Servers = nil
 	}
 
