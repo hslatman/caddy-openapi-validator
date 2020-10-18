@@ -255,8 +255,12 @@ func (v *Validator) prepareOpenAPISpecification() error {
 
 	v.specification = specification
 
-	// TODO: validate the specification is a valid spec? Is actually performed via WithSwagger, but can break the program, so we might need to to this in Validate()
-	router := openapi3filter.NewRouter().WithSwagger(v.specification)
+	// TODO: validate the specification in Validate() too? Does that work with the changes above?
+	router := openapi3filter.NewRouter()
+	err = router.AddSwagger(v.specification)
+	if err != nil {
+		return err
+	}
 	v.router = router
 
 	v.options = &validatorOptions{
