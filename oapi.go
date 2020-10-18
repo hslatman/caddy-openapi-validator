@@ -27,6 +27,8 @@ import (
 
 // TODO: add some other functionality for wrapping kin-openapi / swagger functionality, like validation
 
+var websocketScheme = regexp.MustCompile(`^wss?://`)
+
 // readOpenAPISpecification returns the OpenAPI specification corresponding
 func readOpenAPISpecification(path string) (*openapi3.Swagger, error) {
 
@@ -83,8 +85,7 @@ func addAdditionalServers(o *openapi3.Swagger, servers []string) *openapi3.Swagg
 func isValidOpenAPIUrl(str string) bool {
 	// Replace URLs prefixed with ws and wss into https://, such that ParseRequestURI works
 	if strings.HasPrefix(str, "ws://") || strings.HasPrefix(str, "wss://") {
-		re := regexp.MustCompile(`^wss?://`)
-		str = string(re.ReplaceAll([]byte(str), []byte("https://")))
+		str = string(websocketScheme.ReplaceAll([]byte(str), []byte("https://")))
 	}
 	_, err := url.ParseRequestURI(str)
 	return err == nil
