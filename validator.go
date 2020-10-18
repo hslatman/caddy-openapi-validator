@@ -73,6 +73,7 @@ type Validator struct {
 	// A list of additional servers to be considered valid when
 	// when performing the request validation. The additional servers
 	// are added to the servers in the OpenAPI specification.
+	// Default is empty list
 	AdditionalServers []string `json:"additional_servers,omitempty"`
 	// Indicates whether the OpenAPI specification should be enforced, meaning that invalid
 	// requests and responses will be filtered and an (appropriate) status is returned

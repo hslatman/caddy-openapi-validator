@@ -46,6 +46,7 @@ Configure the OpenAPI Validator handler as one of the handlers to be executed by
                 "validate_servers": true,
                 "validate_security": true,
                 "path_prefix_to_be_trimmed": "",
+                "additional_servers": [""],
                 "enforce": true,
                 "log": true
             }
@@ -73,6 +74,6 @@ A small and incomplete list of potential things to implement, improve and think 
 * Add more tests for the OpenAPI Validator functionality and configuration.
 * Improve Caddyfile handling (e.g. add more subdirectives).
 * Add an example that uses an HTTP proxy/fcgi configuration.
-* Look into ways to specify the error nicely, instead of just logging it (e.g. return error message(s) in specific format).
+* Look into ways to specify the error nicely, instead of just logging it (e.g. return error message(s) in specific format) and/or integrate properly with how Caddy handlers errors.
 * Look into if (and how) the Validator can be used outside of Caddy as an alternative (i.e. a more generic middleware).
 * Add option to specify servers in addition to the one in the OpenAPI specification for server checks.

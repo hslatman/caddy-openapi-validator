@@ -62,6 +62,10 @@ func addAdditionalServers(o *openapi3.Swagger, servers []string) *openapi3.Swagg
 	}
 
 	for i, s := range servers {
+		// TODO: add check that server format is actually OK for OpenAPI?
+		if s == "" {
+			continue
+		}
 		server := &openapi3.Server{
 			URL:         s,
 			Description: fmt.Sprintf("Additional server: %d", i),
