@@ -38,6 +38,7 @@ func createValidator(t *testing.T) (*Validator, error) {
 		ValidateServers:       &boolValue,
 		ValidateSecurity:      &boolValue,
 		PathPrefixToBeTrimmed: "",
+		AdditionalServers:     []string{"https://localhost:9443/api", "http://localhost:9443/api"},
 		Enforce:               &boolValue,
 		Log:                   &boolValue,
 	}
@@ -62,6 +63,7 @@ func replaceValidator(v *Validator) (*Validator, error) {
 		ValidateServers:       v.ValidateServers,
 		ValidateSecurity:      v.ValidateSecurity,
 		PathPrefixToBeTrimmed: v.PathPrefixToBeTrimmed,
+		AdditionalServers:     v.AdditionalServers,
 		Enforce:               v.Enforce,
 		Log:                   v.Log,
 		logger:                v.logger,
@@ -274,7 +276,7 @@ func TestSecurityValidation(t *testing.T) {
 
 	err = v.ServeHTTP(recorder, req, mock)
 	if err != nil {
-		t.Error("expected an error while enforcing security validation")
+		t.Error(err)
 	}
 
 	// We turn security validation off; now requests can be executed without security set
@@ -300,6 +302,51 @@ func TestSecurityValidation(t *testing.T) {
 	err = n.ServeHTTP(recorder, req, mock)
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestAdditionalServers(t *testing.T) {
+	v, err := createValidator(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mock := &mockAPI{}
+
+	req, err := prepareRequest("GET", "http://localhost:9443/api/pets/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+
+	err = v.ServeHTTP(recorder, req, mock)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if status := recorder.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+
+	v.AdditionalServers = []string{}
+
+	n, err := replaceValidator(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req, err = prepareRequest("GET", "http://localhost:9443/api/pets/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder = httptest.NewRecorder()
+
+	err = n.ServeHTTP(recorder, req, mock)
+	if err == nil {
+		t.Error("expected an error without additional servers specified")
 	}
 }
 

@@ -6,10 +6,6 @@ info:
     name: MIT
 servers:
   - url: http://petstore.swagger.io/v1
-  - url: https://localhost:9443/api
-    description: "For local development, testing and demo purposes"
-  - url: http://localhost:9443/api
-    description: "For local development, testing and demo purposes"
 paths:
   /pets:
     get:

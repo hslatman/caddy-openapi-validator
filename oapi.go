@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -25,6 +26,8 @@ import (
 )
 
 // TODO: add some other functionality for wrapping kin-openapi / swagger functionality, like validation
+
+var websocketScheme = regexp.MustCompile(`^wss?://`)
 
 // readOpenAPISpecification returns the OpenAPI specification corresponding
 func readOpenAPISpecification(path string) (*openapi3.Swagger, error) {
@@ -53,6 +56,39 @@ func readOpenAPISpecification(path string) (*openapi3.Swagger, error) {
 	}
 
 	return openapi, nil
+}
+
+func addAdditionalServers(o *openapi3.Swagger, servers []string) *openapi3.Swagger {
+
+	if servers == nil {
+		return o
+	}
+
+	for i, s := range servers {
+		if s == "" {
+			continue
+		}
+		if !isValidOpenAPIUrl(s) {
+			continue
+		}
+		server := &openapi3.Server{
+			URL:         s,
+			Description: fmt.Sprintf("Additional server: %d", i),
+			Variables:   make(map[string]*openapi3.ServerVariable),
+		}
+		o.Servers = append(o.Servers, server)
+	}
+
+	return o
+}
+
+func isValidOpenAPIUrl(str string) bool {
+	// Replace URLs prefixed with ws and wss into https://, such that ParseRequestURI works
+	if strings.HasPrefix(str, "ws://") || strings.HasPrefix(str, "wss://") {
+		str = string(websocketScheme.ReplaceAll([]byte(str), []byte("https://")))
+	}
+	_, err := url.ParseRequestURI(str)
+	return err == nil
 }
 
 func formatFullError(err *openapi3filter.SecurityRequirementsError) error {
