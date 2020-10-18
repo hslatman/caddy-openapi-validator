@@ -15,8 +15,10 @@
 package openapi
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/oxtoacart/bpool"
 
@@ -43,12 +45,6 @@ const (
 
 // Validator is used to validate OpenAPI requests and responses against an OpenAPI specification
 type Validator struct {
-	specification *openapi3.Swagger
-	options       *validatorOptions
-	router        *openapi3filter.Router
-	logger        *zap.Logger
-	bufferPool    *bpool.BufferPool
-
 	// The filepath to the OpenAPI (v3) specification to use
 	Filepath string `json:"filepath,omitempty"`
 	// Indicates whether routes should be validated
@@ -64,6 +60,16 @@ type Validator struct {
 	// Indicates whether request validation should be enabled
 	// Default is true
 	ValidateServers *bool `json:"validate_servers,omitempty"`
+	// Indicates whether request validation should be enabled
+	// Default is true
+	ValidateSecurity *bool `json:"validate_security,omitempty"`
+	// URL path prefix that is trimmed from the URL path.
+	// It can be of use when server validation is turned off
+	// and the paths in an OpenAPI spec do not match the
+	// implementation directly, i.e. are missing an /api prefix,
+	// for example.
+	// Default is empty string, resulting in no prefix trimming.
+	PathPrefixToBeTrimmed string `json:"path_prefix_to_be_trimmed,omitempty"`
 	// Indicates whether the OpenAPI specification should be enforced, meaning that invalid
 	// requests and responses will be filtered and an (appropriate) status is returned
 	// Default is true
@@ -72,7 +78,11 @@ type Validator struct {
 	// Default is true
 	Log *bool `json:"log,omitempty"`
 
-	// TODO: some option to add/override server / disable the server check
+	specification *openapi3.Swagger
+	options       *validatorOptions
+	router        *openapi3filter.Router
+	logger        *zap.Logger
+	bufferPool    *bpool.BufferPool
 }
 
 // CaddyModule returns the Caddy module information.
@@ -229,7 +239,11 @@ func (v *Validator) prepareOpenAPISpecification() error {
 		specification.Servers = nil
 	}
 
-	//specification.Security = nil // TODO: make it possible to configure this
+	if !v.shouldValidateSecurity() {
+		specification.Security = nil
+	}
+
+	// TODO: disable server and security validation on non-top-level; i.e. specific routes?
 
 	v.specification = specification
 
@@ -242,7 +256,7 @@ func (v *Validator) prepareOpenAPISpecification() error {
 			ExcludeRequestBody:    false,
 			ExcludeResponseBody:   false,
 			IncludeResponseStatus: true,
-			AuthenticationFunc:    NoopAuthenticationFunc, // TODO: can we provide an actual one? Should we? And how?
+			AuthenticationFunc:    v.createAuthenticationFunc(),
 		},
 		//ParamDecoder: ,
 	}
@@ -254,6 +268,10 @@ func (v *Validator) shouldValidateServers() bool {
 	return v.ValidateServers == nil || *v.ValidateServers
 }
 
+func (v *Validator) shouldValidateSecurity() bool {
+	return v.ValidateSecurity == nil || *v.ValidateSecurity
+}
+
 func (v *Validator) shouldEnforce() bool {
 	return v.Enforce == nil || *v.Enforce
 }
@@ -262,6 +280,87 @@ func (v *Validator) logError(err error) {
 	if v.Log == nil || *v.Log {
 		v.logger.Error(err.Error())
 		v.logger.Sync()
+	}
+}
+
+// createAuthenticationFunc creates an authentication function based on configuration of the
+// Validator. If an invalid or unknown scheme is encountered, an error is returned by the
+// returned function. Otherwise the return value of the returned function is nil and no
+// security requirement error will be thrown.
+func (v *Validator) createAuthenticationFunc() func(c context.Context, input *openapi3filter.AuthenticationInput) error {
+
+	if !v.shouldValidateSecurity() {
+		return openapi3filter.NoopAuthenticationFunc
+	}
+
+	return func(c context.Context, input *openapi3filter.AuthenticationInput) error {
+
+		// TODO: Can we perform validation of multiple security methods here, like multiple API keys?
+		// That wil only work if the openapi3filter library does it correctly right now. Otherwise
+		// that will need to be patched or we need a workaround for it.
+		// TODO: should we check scopes too?
+
+		scheme := input.SecurityScheme
+		request := input.RequestValidationInput.Request
+
+		switch scheme.Type {
+		case "http":
+			switch scheme.Scheme {
+			case "basic":
+				if _, _, ok := request.BasicAuth(); !ok {
+					return fmt.Errorf("no HTTP basic authentication credentials provided")
+				}
+				return nil
+			case "bearer":
+				header := request.Header.Get("Authorization")
+				if !strings.HasPrefix(header, "Bearer ") {
+					return fmt.Errorf("no HTTP bearer authentication provided")
+				}
+				return nil
+			default:
+				// TODO: should we add a case for other HTTP schemes as defined by RFC 7235 and HTTP Authentication Scheme Registry?
+				// These should then probably be in the Authorization header too?
+				return fmt.Errorf("invalid http scheme %s for credentials", scheme.Scheme)
+			}
+		case "apiKey":
+			name := scheme.Name
+			switch scheme.In {
+			case "query":
+				key := request.URL.Query().Get(name)
+				if key == "" {
+					return fmt.Errorf("failed to retrieve API key from query parameter %s", name)
+				}
+				return nil
+			case "header":
+				canonicalName := http.CanonicalHeaderKey(name)
+				header := request.Header.Get(canonicalName)
+				if header == "" {
+					return fmt.Errorf("failed to retrieve API key from header %s (canonicalized to: %s)", name, canonicalName)
+				}
+				return nil
+			case "cookie":
+				// TODO: do we also need to check CSRF tokens?
+				_, err := request.Cookie(name)
+				if err != nil {
+					return fmt.Errorf("failed to retrieve cookie (%s): %s", name, err.Error())
+				}
+				return nil
+			default:
+				return fmt.Errorf("invalid property %s for carrying an apiKey", scheme.In)
+			}
+		case "oauth2":
+			// TODO: is this checkable? If so, we should implement the check.
+			//return fmt.Errorf("oauth2 security scheme check for %q not implemented yet", input.SecuritySchemeName)
+			v.logger.Debug(fmt.Sprintf("oauth2 security scheme check for %q not implemented (yet)", input.SecuritySchemeName))
+			return nil
+		case "openIdConnect":
+			// TODO: is this checkable? If so, we should implement the check.
+			//return fmt.Errorf("openidconnect security scheme check for %q not implemented yet", input.SecuritySchemeName)
+			v.logger.Debug(fmt.Sprintf("openidconnect security scheme check for %q not implemented )(yet)", input.SecuritySchemeName))
+			return nil
+		default:
+			return fmt.Errorf("security scheme: %s for %q is unknown", scheme.Type, input.SecuritySchemeName)
+		}
 	}
 }
 
