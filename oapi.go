@@ -30,12 +30,11 @@ import (
 var websocketScheme = regexp.MustCompile(`^wss?://`)
 
 // readOpenAPISpecification returns the OpenAPI specification corresponding
-func readOpenAPISpecification(path string) (*openapi3.Swagger, error) {
-
-	var openapi *openapi3.Swagger
+func readOpenAPISpecification(path string) (*openapi3.T, error) {
+	var openapi *openapi3.T
 	uri, err := url.Parse(path)
 	if err == nil {
-		openapi, err = openapi3.NewSwaggerLoader().LoadSwaggerFromURI(uri)
+		openapi, err = openapi3.NewLoader().LoadFromURI(uri)
 		if err != nil {
 			return nil, fmt.Errorf("error loading OpenAPI specification: %s", err)
 		}
@@ -45,7 +44,7 @@ func readOpenAPISpecification(path string) (*openapi3.Swagger, error) {
 		if err != nil || !os.IsExist(err) {
 			return nil, err
 		}
-		openapi, err = openapi3.NewSwaggerLoader().LoadSwaggerFromFile(p)
+		openapi, err = openapi3.NewLoader().LoadFromFile(p)
 		if err != nil {
 			return nil, fmt.Errorf("error loading OpenAPI specification: %s", err)
 		}
@@ -58,8 +57,7 @@ func readOpenAPISpecification(path string) (*openapi3.Swagger, error) {
 	return openapi, nil
 }
 
-func addAdditionalServers(o *openapi3.Swagger, servers []string) *openapi3.Swagger {
-
+func addAdditionalServers(o *openapi3.T, servers []string) *openapi3.T {
 	if servers == nil {
 		return o
 	}

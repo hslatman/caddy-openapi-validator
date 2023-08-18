@@ -28,6 +28,8 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/getkin/kin-openapi/routers"
+	"github.com/getkin/kin-openapi/routers/legacy"
 	"go.uber.org/zap"
 )
 
@@ -83,9 +85,9 @@ type Validator struct {
 	// Default is true
 	Log *bool `json:"log,omitempty"`
 
-	specification *openapi3.Swagger
+	specification *openapi3.T
 	options       *validatorOptions
-	router        *openapi3filter.Router
+	router        routers.Router
 	logger        *zap.Logger
 	bufferPool    *bpool.BufferPool
 }
@@ -256,8 +258,9 @@ func (v *Validator) prepareOpenAPISpecification() error {
 	v.specification = specification
 
 	// TODO: validate the specification in Validate() too? Does that work with the changes above?
-	router := openapi3filter.NewRouter()
-	err = router.AddSwagger(v.specification)
+
+	// TODO: pass in validation options to NewRouter()?
+	router, err := legacy.NewRouter(v.specification)
 	if err != nil {
 		return err
 	}

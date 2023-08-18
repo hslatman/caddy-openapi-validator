@@ -21,7 +21,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
-func getDefaultSpecification() *openapi3.Swagger {
+func getDefaultSpecification() *openapi3.T {
 	defaultServers := []*openapi3.Server{
 		{
 			URL:         "http://petstore.swagger.io/v1",
@@ -29,7 +29,7 @@ func getDefaultSpecification() *openapi3.Swagger {
 			Variables:   make(map[string]*openapi3.ServerVariable),
 		},
 	}
-	return &openapi3.Swagger{Servers: defaultServers}
+	return &openapi3.T{Servers: defaultServers}
 }
 
 func check(actual []*openapi3.Server, expected []string) bool {
