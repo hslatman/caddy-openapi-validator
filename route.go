@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/getkin/kin-openapi/routers"
 )
 
 // validateRoute checks whether a route with the right properties (server, path, method) can be found
@@ -34,14 +35,13 @@ func (v *Validator) validateRoute(r *http.Request) (*openapi3filter.RequestValid
 	} else {
 		url.Scheme = "https"
 	}
-
-	method := r.Method
-	route, pathParams, err := v.router.FindRoute(method, url)
+	r.URL = url
+	route, pathParams, err := v.router.FindRoute(r)
 
 	// No route found for the request
 	if err != nil {
 		switch e := err.(type) {
-		case *openapi3filter.RouteError:
+		case *routers.RouteError:
 			// The requested path doesn't match the server, path or anything else.
 			// TODO: switch between cases based on the e.Reason string? Some are not found, some are invalid method, etc.
 			switch reason := e.Reason; reason {
